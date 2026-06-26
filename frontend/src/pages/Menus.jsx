@@ -273,6 +273,8 @@ export default function Menus() {
               </div>
 
               <div className="grid grid-cols-2 gap-3 pt-2 border-t border-[#E5E2DC]">
+                <div><Label>Yield per Batch (porsi)</Label><Input type="number" value={form.yield_per_batch} onChange={(e) => setForm({ ...form, yield_per_batch: e.target.value })} data-testid="menu-yield-input" /></div>
+                <div className="flex items-end text-xs text-[#6B756D]">1 resep → {form.yield_per_batch || 1} porsi. Bahan/labor auto dibagi.</div>
                 <div><Label>Biaya Tenaga Kerja / pcs</Label><Input type="number" value={form.labor_cost} onChange={(e) => setForm({ ...form, labor_cost: e.target.value })} data-testid="menu-labor-input" /></div>
                 <div><Label>Overhead (gas, listrik) / pcs</Label><Input type="number" value={form.overhead_cost} onChange={(e) => setForm({ ...form, overhead_cost: e.target.value })} data-testid="menu-overhead-input" /></div>
                 <div><Label>Target Margin (%)</Label><Input type="number" value={form.margin_target_pct} onChange={(e) => setForm({ ...form, margin_target_pct: e.target.value })} data-testid="menu-margin-input" /></div>

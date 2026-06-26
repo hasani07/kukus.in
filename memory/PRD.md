@@ -1,36 +1,30 @@
 # Kukus.In Financial Management - PRD
 
 ## Original Problem Statement
-User just registered ShopeeFood merchant "Kukus.In" (healthy steamed food). Needs full financial management: ingredient cost, packaging cost, HPP calculator, selling price recommendation, stock tracking, sales recording (monthly), invoice generation.
+ShopeeFood merchant "Kukus.In" (healthy steamed food). Full financial management: ingredient cost, packaging, HPP, selling price, stock, sales recording, invoice generation.
 
 ## User Choices
-- No authentication (single-user)
-- IDR + Bahasa Indonesia
-- Both customer invoice + monthly reports
-- No AI integration
+- No auth (single-user), IDR + Bahasa Indonesia, both invoice + reports, no AI
 
 ## Architecture
-- Backend: FastAPI + MongoDB (6 collections: ingredients, packaging, menus, sales, invoices, settings)
-- Frontend: React + Shadcn + Tailwind + Recharts
-- Theme: Organic & Earthy (sage green #4A6750 + terracotta #D17B60) with Manrope/IBM Plex Sans fonts
+- Backend: FastAPI + MongoDB (10 collections: ingredients, packaging, menus, sales, invoices, settings, operating_costs, purchases, customers)
+- Frontend: React + Shadcn + Tailwind + Recharts; theme Organic Earthy (sage + terracotta)
 
-## Implemented (Phase 1 — Feb 2026)
-- ✅ Bahan Baku CRUD with low-stock alerts (price/unit, stock, threshold)
-- ✅ Packaging CRUD with low-stock alerts
-- ✅ Menu/Recipe builder with auto HPP calculator (ingredients + packaging + labor + overhead)
-- ✅ Live recommended-price calculator: price = HPP / ((1-margin)*(1-fee)), rounded ↑ 500
-- ✅ Sales recording with auto stock deduction; platform fee + profit auto-computed; supports ShopeeFood/GoFood/GrabFood/Dine-In/Cash channels
-- ✅ Sales deletion restores stock back
-- ✅ Invoice generation with auto-numbered INV-YYYYMM-NNNN, printable PDF view (/invoice/:id/print)
-- ✅ Invoice status workflow (unpaid/paid/cancelled)
-- ✅ Settings: business info + default margin/fee
-- ✅ Dashboard: revenue, profit, margin %, items sold, daily trend, top 5 best sellers, channel breakdown, low-stock alerts
-- ✅ Mobile-responsive sidebar nav
+## Implemented (Phase 1+2 — Feb 2026)
+### Phase 1 (MVP)
+- ✅ Bahan Baku, Packaging, Menu/HPP, Penjualan, Invoice, Dashboard, Settings
 
-## Backlog (Future Iterations)
-- P1: CSV/Excel export sales, recap PDF bulanan, multi-platform fee profile (per channel auto)
-- P1: Stock movement history (manual adjustment, restocking ingredient with cost averaging)
-- P2: Customer database (recurring customers for catering)
-- P2: Recipe scaling helper (yield per resep > 1 porsi)
-- P2: Cash flow tracker (expenses non-bahan: sewa, marketing, dll)
-- P2: Multi-outlet support
+### Phase 2 (Expansion)
+- ✅ Recipe Yield: 1 batch → N porsi, bahan & labor auto dibagi
+- ✅ Psychological price suggestions (3 variants ending 500/900/099)
+- ✅ Biaya Operasional (rent, utility, salary, marketing, dll) with monthly summary
+- ✅ Belanja & Restock dengan Moving Average Cost (HPP auto-update)
+- ✅ Customer CRM (regular/catering/corporate) + WhatsApp link generator
+- ✅ Laporan & Analisis: P&L Bulanan REAL (revenue - cogs - opcosts = net profit), Break-Even Calculator, Promo ROI Calculator
+- ✅ WhatsApp order form generator (bypass fee 20%)
+
+## Backlog
+- P1: Expiry tracking UI for ingredients (backend supports expiry_date)
+- P1: CSV/Excel export, monthly recap PDF
+- P2: Shopping list auto-generate dari forecast
+- P2: Multi-outlet, sales forecast AI
