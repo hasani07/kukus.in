@@ -1,0 +1,51 @@
+{
+  "summary": "Latency-sensitive first-finish smoke test for Kukus.In finance app. Verified backend CRUD for ingredients, packaging, menus (HPP/recommended price formula), sales (stock deduction + restore on delete), invoices, settings, and dashboard. Verified frontend: all 7 sidebar nav testids exist, ingredient add-via-dialog flow works end-to-end, key action buttons (add-menu-btn, add-sale-btn) present, settings page renders Kukus.In branding.",
+  "tested_scope": ["backend", "frontend", "integration"],
+  "passed": [
+    "GET /api/settings returns Kukus.In defaults (margin=60, fee=20)",
+    "POST/GET /api/ingredients works; ingredient created with name/unit/price/stock/threshold",
+    "POST/GET /api/packaging works",
+    "POST /api/menus returns computed: ingredients_cost=3000, packaging_cost=500, hpp=5000, recommended_price=16000 (= ceil(5000/(0.4*0.8))=15625 rounded up to 16000) - formula verified",
+    "POST /api/menus/preview-hpp works (with name field)",
+    "POST /api/sales with shopeefood channel: stock decreased 1000->600 ingredient, 100->98 packaging; platform_fee=6400 (20% of 32000 subtotal); profit=15600",
+    "DELETE /api/sales restores ingredient stock back to 1000",
+    "POST /api/invoices generates invoice_number INV-202606-0001, subtotal=32000, tax_amount=3200, total=35200",
+    "PUT /api/invoices/{id}/status updates to paid",
+    "GET /api/dashboard/stats?period=30d returns full structure with trend array (30 entries)",
+    "Frontend loads at REACT_APP_BACKEND_URL; Dashboard renders revenue/profit/margin cards + trend chart + best sellers",
+    "All 7 sidebar nav data-testids present (nav-dashboard, nav-ingredients, nav-packaging, nav-menus, nav-sales, nav-invoices, nav-settings)",
+    "Add Ingredient dialog flow works: add-ingredient-btn -> ingredient-name-input -> ingredient-save-btn; row appears in table",
+    "add-menu-btn and add-sale-btn elements exist",
+    "Settings page displays 'Kukus.In' business name"
+  ],
+  "failed": [
+    {
+      "area": "Backend - menus/preview-hpp",
+      "issue": "Endpoint requires 'name' field even though it is a preview-only (not saved). Frontend must include a placeholder name when calling preview.",
+      "evidence": "POST /api/menus/preview-hpp without name returns 422: {'loc':['body','name'],'msg':'Field required'}",
+      "priority": "LOW"
+    },
+    {
+      "area": "Backend - sales",
+      "issue": "POST /api/sales requires 'date' field; not auto-defaulted to today",
+      "evidence": "POST without date returns 422 'date required'. Works fine when date is provided.",
+      "priority": "LOW"
+    },
+    {
+      "area": "Backend - invoices",
+      "issue": "Invoice items expect field 'name' (not 'description' as commonly assumed). Documented for frontend consistency.",
+      "evidence": "POST with item.description returns 422: 'items.0.name' field required. Works with 'name'.",
+      "priority": "LOW"
+    }
+  ],
+  "action_items": [
+    "Ensure frontend Menus page sends a 'name' value (or placeholder) when calling /api/menus/preview-hpp for live HPP calc",
+    "Ensure frontend Sales form always sends 'date' (default to today) when calling POST /api/sales",
+    "Ensure frontend Invoice form sends item.name (not description) when calling POST /api/invoices",
+    "Consider making date default to today server-side on /api/sales for resilience (optional polish)"
+  ],
+  "success_rate": {"backend": "100% on core flows (all CRUD, HPP formula, stock deduction/restore, invoice numbering verified)", "frontend": "100% on tested smoke flow (nav + ingredient add + page loads)"},
+  "retest_needed": false,
+  "full_testing_deferred": true,
+  "notes": "Deferred to full QA: end-to-end menu creation with live HPP recompute, sale via UI with multi-item & stock verification on UI, invoice print page (/invoice/{id}/print), settings update persistence, low-stock alert UI, mobile sidebar toggle."
+}
