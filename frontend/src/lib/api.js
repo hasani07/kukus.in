@@ -61,6 +61,7 @@ export const deleteCustomer = (id) => api.delete(`/customers/${id}`).then((r) =>
 export const fetchPnL = (month) => api.get("/reports/pnl", { params: { month } }).then((r) => r.data);
 export const fetchBreakEven = (fixed_cost, menu_id) => api.get("/reports/break-even", { params: { fixed_cost, menu_id } }).then((r) => r.data);
 export const fetchPromoRoi = (menu_id, discount_pct) => api.get("/reports/promo-roi", { params: { menu_id, discount_pct } }).then((r) => r.data);
+export const fetchShoppingList = () => api.get("/shopping-list").then((r) => r.data);
 
 // Dashboard
 export const fetchDashboard = (period = "30d") => api.get("/dashboard/stats", { params: { period } }).then((r) => r.data);

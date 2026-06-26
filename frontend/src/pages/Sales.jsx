@@ -11,7 +11,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
-import { Plus, Trash2, ShoppingBag, X } from "lucide-react";
+import { Plus, Trash2, ShoppingBag, X, Download } from "lucide-react";
 import { toast } from "sonner";
 
 const channels = [
@@ -22,6 +22,23 @@ const channels = [
   { v: "cash", label: "Cash" },
   { v: "other", label: "Lainnya" },
 ];
+
+const exportCSV = (sales) => {
+  if (sales.length === 0) { toast.error("Belum ada data penjualan"); return; }
+  const rows = [["Tanggal", "Channel", "Items", "Qty", "Subtotal", "Platform Fee", "Diskon", "Net Total", "HPP", "Profit", "Catatan"]];
+  sales.forEach((s) => {
+    const itemsStr = s.items.map((i) => `${i.menu_name} x${i.qty}`).join(" | ");
+    const totalQty = s.items.reduce((a, b) => a + b.qty, 0);
+    rows.push([s.date, s.channel, itemsStr, totalQty, s.subtotal, s.platform_fee, s.discount, s.total, s.total_hpp, s.profit, s.notes || ""]);
+  });
+  const csv = rows.map((r) => r.map((c) => `"${String(c).replace(/"/g, '""')}"`).join(",")).join("\n");
+  const blob = new Blob(["\uFEFF" + csv], { type: "text/csv;charset=utf-8" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url; a.download = `kukus-in-penjualan-${todayISO()}.csv`; a.click();
+  URL.revokeObjectURL(url);
+  toast.success("CSV berhasil diunduh");
+};
 
 export default function Sales() {
   const [sales, setSales] = useState([]);
@@ -77,9 +94,14 @@ export default function Sales() {
         subtitle="Catat setiap order. Stok bahan & packaging terpotong otomatis sesuai resep."
         testId="sales-page"
         action={
-          <Button onClick={openCreate} className="bg-[#4A6750] hover:bg-[#3B5340] text-white" data-testid="add-sale-btn">
-            <Plus size={16} className="mr-2" /> Catat Penjualan
-          </Button>
+          <div className="flex gap-2">
+            <Button onClick={() => exportCSV(sales)} variant="outline" className="border-[#4A6750] text-[#4A6750]" data-testid="export-csv-btn">
+              <Download size={14} className="mr-2" /> Export CSV
+            </Button>
+            <Button onClick={openCreate} className="bg-[#4A6750] hover:bg-[#3B5340] text-white" data-testid="add-sale-btn">
+              <Plus size={16} className="mr-2" /> Catat Penjualan
+            </Button>
+          </div>
         }
       />
 

@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { fetchIngredients, createIngredient, updateIngredient, deleteIngredient } from "@/lib/api";
+import { fetchIngredients, createIngredient, updateIngredient, deleteIngredient, fetchSettings, fetchShoppingList } from "@/lib/api";
 import { formatIDR, formatNumber } from "@/lib/format";
 import PageHeader from "@/components/PageHeader";
 import EmptyState from "@/components/EmptyState";
@@ -9,7 +9,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
-import { Plus, Pencil, Trash2, Carrot } from "lucide-react";
+import { Plus, Pencil, Trash2, Carrot, ShoppingCart, MessageCircle } from "lucide-react";
 import { toast } from "sonner";
 
 const empty = { name: "", unit: "gr", price_per_unit: 0, stock: 0, low_stock_threshold: 0, notes: "" };
@@ -19,9 +19,30 @@ export default function Ingredients() {
   const [open, setOpen] = useState(false);
   const [form, setForm] = useState(empty);
   const [editingId, setEditingId] = useState(null);
+  const [shopOpen, setShopOpen] = useState(false);
+  const [shopData, setShopData] = useState(null);
 
   const load = async () => setItems(await fetchIngredients());
   useEffect(() => { load(); }, []);
+
+  const openShoppingList = async () => {
+    const data = await fetchShoppingList();
+    setShopData(data);
+    setShopOpen(true);
+  };
+
+  const shareShoppingWA = async () => {
+    const s = await fetchSettings();
+    const lines = ["📋 *Daftar Belanja Kukus.In*", ""];
+    shopData.items.forEach((i, idx) => {
+      lines.push(`${idx + 1}. ${i.name} — *${formatNumber(i.suggested_qty, 1)} ${i.unit}* (stok: ${formatNumber(i.current_stock, 1)})`);
+    });
+    lines.push("", `Total estimasi: *${formatIDR(shopData.total_estimate)}*`);
+    const msg = lines.join("\n");
+    const phone = (s.business_phone || "").replace(/[^0-9]/g, "").replace(/^0/, "62");
+    const url = phone ? `https://wa.me/${phone}?text=${encodeURIComponent(msg)}` : `https://wa.me/?text=${encodeURIComponent(msg)}`;
+    window.open(url, "_blank");
+  };
 
   const openCreate = () => { setForm(empty); setEditingId(null); setOpen(true); };
   const openEdit = (it) => { setForm({ ...empty, ...it }); setEditingId(it.id); setOpen(true); };
@@ -65,9 +86,14 @@ export default function Ingredients() {
         subtitle="Catat semua bahan beserta harga per unit & stock. Digunakan untuk hitung HPP menu."
         testId="ingredients-page"
         action={
-          <Button onClick={openCreate} className="bg-[#4A6750] hover:bg-[#3B5340] text-white" data-testid="add-ingredient-btn">
-            <Plus size={16} className="mr-2" /> Tambah Bahan
-          </Button>
+          <div className="flex gap-2">
+            <Button onClick={openShoppingList} variant="outline" className="border-[#D17B60] text-[#D17B60] hover:bg-[#FAEDE9]" data-testid="shopping-list-btn">
+              <ShoppingCart size={14} className="mr-2" /> Daftar Belanja
+            </Button>
+            <Button onClick={openCreate} className="bg-[#4A6750] hover:bg-[#3B5340] text-white" data-testid="add-ingredient-btn">
+              <Plus size={16} className="mr-2" /> Tambah Bahan
+            </Button>
+          </div>
         }
       />
 
@@ -165,6 +191,50 @@ export default function Ingredients() {
           <DialogFooter>
             <Button variant="outline" onClick={() => setOpen(false)} data-testid="ingredient-cancel-btn">Batal</Button>
             <Button onClick={save} className="bg-[#4A6750] hover:bg-[#3B5340] text-white" data-testid="ingredient-save-btn">Simpan</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+      <Dialog open={shopOpen} onOpenChange={setShopOpen}>
+        <DialogContent className="bg-white max-w-2xl" data-testid="shopping-list-dialog">
+          <DialogHeader><DialogTitle>📋 Daftar Belanja</DialogTitle></DialogHeader>
+          {shopData && (
+            <div>
+              {shopData.items.length === 0 ? (
+                <div className="py-8 text-center">
+                  <p className="text-[#4A6750] font-semibold">✅ Stok semua aman!</p>
+                  <p className="text-sm text-[#6B756D] mt-2">Tidak ada bahan yang perlu direstock saat ini.</p>
+                </div>
+              ) : (
+                <>
+                  <div className="space-y-2 max-h-96 overflow-y-auto">
+                    {shopData.items.map((i, idx) => (
+                      <div key={i.ingredient_id} className="flex justify-between items-center p-3 bg-[#F4F1EA] rounded-md">
+                        <div>
+                          <p className="font-semibold text-[#2D3A30]">{idx + 1}. {i.name}</p>
+                          <p className="text-xs text-[#6B756D]">Stok: {formatNumber(i.current_stock, 1)} / Min: {formatNumber(i.threshold, 1)} {i.unit}</p>
+                        </div>
+                        <div className="text-right">
+                          <p className="font-bold text-[#D17B60]">{formatNumber(i.suggested_qty, 1)} {i.unit}</p>
+                          <p className="text-xs text-[#6B756D]">~ {formatIDR(i.estimated_cost)}</p>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                  <div className="mt-4 p-3 bg-[#E9EFEA] rounded-md flex justify-between">
+                    <span className="font-semibold text-[#2D3A30]">Total Estimasi Belanja</span>
+                    <span className="font-extrabold text-[#4A6750]">{formatIDR(shopData.total_estimate)}</span>
+                  </div>
+                </>
+              )}
+            </div>
+          )}
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShopOpen(false)} data-testid="shopping-close-btn">Tutup</Button>
+            {shopData?.items.length > 0 && (
+              <Button onClick={shareShoppingWA} className="bg-[#25D366] hover:bg-[#1FA855] text-white" data-testid="shopping-wa-btn">
+                <MessageCircle size={14} className="mr-2" /> Share via WhatsApp
+              </Button>
+            )}
           </DialogFooter>
         </DialogContent>
       </Dialog>

@@ -28,12 +28,15 @@ export default function InvoicePrint() {
 
         <div className="invoice-print bg-white border border-[#E5E2DC] rounded-lg p-10 shadow-sm">
           <div className="flex justify-between items-start mb-10 pb-6 border-b border-[#E5E2DC]">
-            <div>
-              <h1 className="text-3xl font-extrabold text-[#2D3A30]">{biz.business_name}<span className="text-[#D17B60]">.</span></h1>
-              <p className="text-sm text-[#6B756D] mt-1">{biz.business_tagline}</p>
-              {biz.business_address && <p className="text-xs text-[#6B756D] mt-3 max-w-xs">{biz.business_address}</p>}
-              {biz.business_phone && <p className="text-xs text-[#6B756D]">{biz.business_phone}</p>}
-              {biz.business_email && <p className="text-xs text-[#6B756D]">{biz.business_email}</p>}
+            <div className="flex items-start gap-4">
+              <img src="https://customer-assets.emergentagent.com/job_food-cost-tracker-22/artifacts/3t2znag2_ChatGPT%20Image%20Jun%2026%2C%202026%2C%2004_10_26%20PM.png" alt={biz.business_name} className="w-24 h-24 object-contain" />
+              <div>
+                <h1 className="text-3xl font-extrabold text-[#2D3A30]">{biz.business_name}</h1>
+                <p className="text-sm text-[#6B756D] mt-1">{biz.business_tagline}</p>
+                {biz.business_address && <p className="text-xs text-[#6B756D] mt-3 max-w-xs">{biz.business_address}</p>}
+                {biz.business_phone && <p className="text-xs text-[#6B756D]">{biz.business_phone}</p>}
+                {biz.business_email && <p className="text-xs text-[#6B756D]">{biz.business_email}</p>}
+              </div>
             </div>
             <div className="text-right">
               <p className="text-xs uppercase tracking-[0.2em] text-[#A1A8A3] font-bold">Invoice</p>

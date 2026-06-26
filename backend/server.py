@@ -879,6 +879,32 @@ async def promo_roi(menu_id: str, discount_pct: float):
     }
 
 
+@api_router.get("/shopping-list")
+async def shopping_list():
+    """Generate shopping list dari bahan yang stoknya <= threshold."""
+    low = await db.ingredients.find(
+        {"$expr": {"$lte": ["$stock", "$low_stock_threshold"]}},
+        {"_id": 0}
+    ).to_list(500)
+    items = []
+    total_estimate = 0
+    for ing in low:
+        suggested_qty = max(ing.get("low_stock_threshold", 0) * 2 - ing.get("stock", 0), ing.get("low_stock_threshold", 0))
+        est_cost = suggested_qty * ing.get("price_per_unit", 0)
+        total_estimate += est_cost
+        items.append({
+            "ingredient_id": ing["id"],
+            "name": ing["name"],
+            "unit": ing["unit"],
+            "current_stock": ing.get("stock", 0),
+            "threshold": ing.get("low_stock_threshold", 0),
+            "suggested_qty": suggested_qty,
+            "price_per_unit": ing.get("price_per_unit", 0),
+            "estimated_cost": est_cost,
+        })
+    return {"items": items, "total_estimate": total_estimate, "count": len(items)}
+
+
 # ============== Dashboard ==============
 @api_router.get("/dashboard/stats")
 async def dashboard_stats(period: str = "30d"):

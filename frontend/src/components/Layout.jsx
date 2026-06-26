@@ -43,15 +43,14 @@ export default function Layout() {
       >
         <div className="p-6 border-b border-[#E5E2DC]">
           <div className="flex items-center justify-between">
-            <div>
-              <h1 className="font-extrabold text-2xl text-[#2D3A30] tracking-tight">Kukus<span className="text-[#D17B60]">.In</span></h1>
-              <p className="text-xs text-[#6B756D] mt-0.5 tracking-wider uppercase">Finance Suite</p>
+            <div className="flex items-center gap-3">
+              <img src="https://customer-assets.emergentagent.com/job_food-cost-tracker-22/artifacts/3t2znag2_ChatGPT%20Image%20Jun%2026%2C%202026%2C%2004_10_26%20PM.png" alt="Kukus.In" className="w-12 h-12 object-contain" data-testid="sidebar-logo" />
+              <div>
+                <h1 className="font-extrabold text-xl text-[#2D3A30] tracking-tight leading-none">Kukus<span className="text-[#D17B60]">.in</span></h1>
+                <p className="text-[10px] text-[#6B756D] mt-0.5 tracking-wider uppercase">Finance Suite</p>
+              </div>
             </div>
-            <button
-              onClick={() => setOpen(false)}
-              className="lg:hidden p-2 text-[#6B756D]"
-              data-testid="sidebar-close-btn"
-            >
+            <button onClick={() => setOpen(false)} className="lg:hidden p-2 text-[#6B756D]" data-testid="sidebar-close-btn">
               <X size={20} />
             </button>
           </div>

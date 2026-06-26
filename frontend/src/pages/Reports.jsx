@@ -49,8 +49,12 @@ function PnLTab({ defaultMonth }) {
       </div>
 
       {data && (
-        <Card className="border-[#E5E2DC]"><CardContent className="p-8">
-          <h3 className="font-bold text-xl text-[#2D3A30] mb-6">Laporan Laba-Rugi {month}</h3>
+        <Card className="border-[#E5E2DC] pnl-printable"><CardContent className="p-8">
+          <div className="flex justify-between items-start mb-6 no-print">
+            <h3 className="font-bold text-xl text-[#2D3A30]">Laporan Laba-Rugi {month}</h3>
+            <Button size="sm" variant="outline" onClick={() => window.print()} data-testid="print-pnl-btn">🖨️ Print / Save PDF</Button>
+          </div>
+          <h3 className="font-bold text-xl text-[#2D3A30] mb-6 print-only">Kukus.In · Laporan Laba-Rugi {month}</h3>
           <div className="space-y-3 max-w-2xl">
             <Row label="Pendapatan (Revenue)" value={data.revenue} positive />
             <Row label="HPP (Cost of Goods Sold)" value={-data.cogs} />

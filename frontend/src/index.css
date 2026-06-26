@@ -57,17 +57,20 @@ h1, h2, h3, h4, h5 {
   }
 }
 
-/* Print styles for invoice */
+/* Print styles for invoice & reports */
 @media print {
   body { background: white !important; }
-  .no-print { display: none !important; }
+  .no-print, aside, header, [data-testid="sidebar"], .sonner-toaster, .sidebar { display: none !important; }
   .print-only { display: block !important; }
-  .invoice-print {
+  .invoice-print, .pnl-printable {
     max-width: 100%;
     margin: 0;
     padding: 0;
     box-shadow: none !important;
+    border: none !important;
   }
+  /* Hide tabs nav when printing */
+  [role="tablist"] { display: none !important; }
 }
 
 .print-only { display: none; }
