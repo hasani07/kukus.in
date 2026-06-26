@@ -56,7 +56,9 @@ export default function Menus() {
           yield_per_batch: Number(form.yield_per_batch) || 1,
         });
         setPreview(p);
-      } catch {}
+      } catch (err) {
+        console.error("Preview HPP failed:", err);
+      }
     }, 250);
     return () => clearTimeout(t);
   }, [form, open]);

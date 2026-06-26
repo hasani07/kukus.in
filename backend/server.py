@@ -856,15 +856,14 @@ async def promo_roi(menu_id: str, discount_pct: float):
     promo_net = promo_price * (1 - fee_pct)
     promo_profit = promo_net - c["hpp"]
 
+    multiplier = None
+    warning = None
     if promo_profit <= 0:
-        multiplier = None
         warning = "⚠️ Promo ini bikin RUGI per porsi! Jangan diteruskan."
     elif normal_profit <= 0:
-        multiplier = None
         warning = "Menu ini belum profitable normal."
     else:
         multiplier = normal_profit / promo_profit
-        warning = None
 
     return {
         "menu_id": menu_id,

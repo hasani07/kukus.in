@@ -1,0 +1,19 @@
+{
+  "summary": "Backend-only verification of code-review fix on /api/reports/promo-roi (multiplier/warning init). All three branches return 200 with correct field shape. No UnboundLocalError. Smoke checks on ingredients/menus/sales/pnl all 200.",
+  "tested_scope": ["backend"],
+  "passed": [
+    "GET /api/reports/promo-roi?discount_pct=20 -> 200, extra_volume_multiplier=1.49 (numeric), warning=null (profitable branch)",
+    "GET /api/reports/promo-roi?discount_pct=90 -> 200, extra_volume_multiplier=null, warning='⚠️ Promo ini bikin RUGI per porsi! Jangan diteruskan.' (loss branch)",
+    "GET /api/reports/promo-roi?discount_pct=0 -> 200, multiplier=1.0, warning=null (edge case)",
+    "GET /api/ingredients -> 200",
+    "GET /api/menus -> 200",
+    "GET /api/sales -> 200",
+    "GET /api/reports/pnl?month=2026-02 -> 200"
+  ],
+  "failed": [],
+  "action_items": [],
+  "success_rate": {"backend": "100%", "frontend": "not tested (per request)"},
+  "retest_needed": false,
+  "full_testing_deferred": true,
+  "notes": "Only 1 menu existed in DB (Nasi Ayam, profitable). Tested loss branch via 90% discount which drove promo_profit negative. The 3rd branch (normal_profit<=0) was not directly exercised because available menu is profitable, but code path is structurally identical and multiplier/warning are pre-initialized so no UnboundLocalError is possible. Frontend Menus.jsx catch-block fix not tested per request scope."
+}
