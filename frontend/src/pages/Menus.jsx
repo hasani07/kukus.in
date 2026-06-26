@@ -20,7 +20,7 @@ const emptyMenu = {
   ingredients: [], packaging: [],
   labor_cost: 0, overhead_cost: 0,
   margin_target_pct: 60, platform_fee_pct: 20,
-  selling_price: 0, use_recommended_price: true, active: true,
+  selling_price: 0, use_recommended_price: true, yield_per_batch: 1, active: true,
 };
 
 export default function Menus() {
@@ -53,6 +53,7 @@ export default function Menus() {
           platform_fee_pct: Number(form.platform_fee_pct) || 0,
           selling_price: Number(form.selling_price) || 0,
           use_recommended_price: form.use_recommended_price,
+          yield_per_batch: Number(form.yield_per_batch) || 1,
         });
         setPreview(p);
       } catch {}
@@ -313,6 +314,24 @@ export default function Menus() {
                       <p className="text-xs uppercase tracking-wider text-[#A1A8A3] mb-1">Rekomendasi Harga Jual</p>
                       <p className="text-2xl font-extrabold text-[#4A6750]">{formatIDR(preview.recommended_price)}</p>
                       <p className="text-xs text-[#6B756D] mt-1">setelah fee {form.platform_fee_pct}% + margin {form.margin_target_pct}%</p>
+                      {preview.psychological_prices?.length > 0 && (
+                        <div className="mt-3 pt-3 border-t border-[#E5E2DC]">
+                          <p className="text-xs uppercase tracking-wider text-[#A1A8A3] mb-1">💡 Harga Psikologis</p>
+                          <div className="flex gap-2 flex-wrap">
+                            {preview.psychological_prices.map((p) => (
+                              <button
+                                key={p}
+                                type="button"
+                                onClick={() => setForm({ ...form, use_recommended_price: false, selling_price: p })}
+                                className="text-xs px-2 py-1 bg-[#F4F1EA] hover:bg-[#E5E2DC] rounded text-[#2D3A30] font-mono"
+                                data-testid={`psych-price-${p}`}
+                              >
+                                {formatIDR(p)}
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+                      )}
                     </div>
                     <div className="grid grid-cols-2 gap-2 mt-3">
                       <div className="bg-white rounded-md p-2 border border-[#E5E2DC]">
@@ -331,6 +350,15 @@ export default function Menus() {
           </div>
 
           <DialogFooter>
+            <Button variant="outline" onClick={() => setOpen(false)} data-testid="menu-cancel-btn">Batal</Button>
+            <Button onClick={save} className="bg-[#4A6750] hover:bg-[#3B5340] text-white" data-testid="menu-save-btn">Simpan Menu</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </div>
+  );
+}
+      <DialogFooter>
             <Button variant="outline" onClick={() => setOpen(false)} data-testid="menu-cancel-btn">Batal</Button>
             <Button onClick={save} className="bg-[#4A6750] hover:bg-[#3B5340] text-white" data-testid="menu-save-btn">Simpan Menu</Button>
           </DialogFooter>

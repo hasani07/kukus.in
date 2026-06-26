@@ -36,10 +36,11 @@ class Ingredient(BaseModel):
     model_config = ConfigDict(extra="ignore")
     id: str = Field(default_factory=new_id)
     name: str
-    unit: str  # gr, ml, pcs, kg, etc.
-    price_per_unit: float  # IDR per unit
+    unit: str
+    price_per_unit: float
     stock: float = 0
     low_stock_threshold: float = 0
+    expiry_date: Optional[str] = None
     notes: Optional[str] = None
     created_at: str = Field(default_factory=now_iso)
     updated_at: str = Field(default_factory=now_iso)
@@ -51,6 +52,7 @@ class IngredientCreate(BaseModel):
     price_per_unit: float
     stock: float = 0
     low_stock_threshold: float = 0
+    expiry_date: Optional[str] = None
     notes: Optional[str] = None
 
 
@@ -94,10 +96,11 @@ class Menu(BaseModel):
     packaging: List[RecipePackaging] = []
     labor_cost: float = 0  # per unit
     overhead_cost: float = 0  # per unit (gas, listrik, dll)
-    margin_target_pct: float = 60  # default 60%
-    platform_fee_pct: float = 20  # ShopeeFood default ~20%
-    selling_price: float = 0  # manual override
+    margin_target_pct: float = 60
+    platform_fee_pct: float = 20
+    selling_price: float = 0
     use_recommended_price: bool = True
+    yield_per_batch: float = 1  # 1 batch resep menghasilkan brp porsi
     active: bool = True
     created_at: str = Field(default_factory=now_iso)
     updated_at: str = Field(default_factory=now_iso)
@@ -115,6 +118,7 @@ class MenuCreate(BaseModel):
     platform_fee_pct: float = 20
     selling_price: float = 0
     use_recommended_price: bool = True
+    yield_per_batch: float = 1
     active: bool = True
 
 
@@ -238,7 +242,9 @@ async def compute_hpp(menu: dict) -> dict:
 
     labor = float(menu.get("labor_cost", 0) or 0)
     overhead = float(menu.get("overhead_cost", 0) or 0)
-    hpp = ingredients_cost + packaging_cost + labor + overhead
+    yield_n = max(float(menu.get("yield_per_batch", 1) or 1), 1)
+    # Bahan dibagi yield (batch cooking), packaging tetap per porsi
+    hpp = (ingredients_cost / yield_n) + packaging_cost + (labor / yield_n) + (overhead / yield_n)
 
     margin = float(menu.get("margin_target_pct", 60) or 0) / 100.0
     fee = float(menu.get("platform_fee_pct", 0) or 0) / 100.0
@@ -262,13 +268,26 @@ async def compute_hpp(menu: dict) -> dict:
     profit_per_unit = net_per_unit - hpp
     profit_margin_pct = (profit_per_unit / net_per_unit * 100) if net_per_unit > 0 else 0
 
+    # Psychological price suggestions
+    psych_prices = []
+    if recommended_price > 0:
+        base = int(recommended_price)
+        # ujung 900, 500, 000
+        psych_prices = sorted(set([
+            ((base // 1000) * 1000) + 900,
+            ((base // 1000) * 1000) + 500,
+            ((base // 1000 + 1) * 1000) - 100,
+        ]))
+
     return {
         "ingredients_cost": ingredients_cost,
         "packaging_cost": packaging_cost,
         "labor_cost": labor,
         "overhead_cost": overhead,
+        "yield_per_batch": yield_n,
         "hpp": hpp,
         "recommended_price": recommended_price,
+        "psychological_prices": psych_prices,
         "selling_price": selling,
         "net_per_unit": net_per_unit,
         "profit_per_unit": profit_per_unit,
@@ -577,6 +596,285 @@ async def update_settings(data: Settings):
     update["updated_at"] = now_iso()
     await db.settings.update_one({"id": "default"}, {"$set": update}, upsert=True)
     return update
+
+
+# ============== Operating Costs (Biaya Operasional Non-Bahan) ==============
+class OperatingCost(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+    id: str = Field(default_factory=new_id)
+    name: str
+    category: str = "other"  # rent, utility, salary, marketing, equipment, other
+    amount: float
+    frequency: str = "monthly"  # monthly, daily, one-time
+    date: str  # YYYY-MM-DD
+    notes: Optional[str] = None
+    created_at: str = Field(default_factory=now_iso)
+
+
+class OperatingCostCreate(BaseModel):
+    name: str
+    category: str = "other"
+    amount: float
+    frequency: str = "monthly"
+    date: str
+    notes: Optional[str] = None
+
+
+@api_router.get("/operating-costs")
+async def list_op_costs():
+    docs = await db.operating_costs.find({}, {"_id": 0}).sort("date", -1).to_list(1000)
+    return docs
+
+
+@api_router.post("/operating-costs")
+async def create_op_cost(data: OperatingCostCreate):
+    obj = OperatingCost(**data.model_dump())
+    await db.operating_costs.insert_one(obj.model_dump())
+    return obj
+
+
+@api_router.delete("/operating-costs/{cid}")
+async def delete_op_cost(cid: str):
+    await db.operating_costs.delete_one({"id": cid})
+    return {"ok": True}
+
+
+# ============== Purchases / Restock ==============
+class Purchase(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+    id: str = Field(default_factory=new_id)
+    ingredient_id: str
+    ingredient_name: str
+    qty: float
+    price_per_unit: float
+    total_cost: float
+    date: str
+    supplier: Optional[str] = None
+    notes: Optional[str] = None
+    created_at: str = Field(default_factory=now_iso)
+
+
+class PurchaseCreate(BaseModel):
+    ingredient_id: str
+    qty: float
+    price_per_unit: float
+    date: str
+    supplier: Optional[str] = None
+    notes: Optional[str] = None
+
+
+@api_router.get("/purchases")
+async def list_purchases():
+    docs = await db.purchases.find({}, {"_id": 0}).sort("date", -1).to_list(2000)
+    return docs
+
+
+@api_router.post("/purchases")
+async def create_purchase(data: PurchaseCreate):
+    ing = await db.ingredients.find_one({"id": data.ingredient_id}, {"_id": 0})
+    if not ing:
+        raise HTTPException(status_code=404, detail="Bahan tidak ditemukan")
+    total = data.qty * data.price_per_unit
+    # Moving average cost update
+    old_stock = float(ing.get("stock", 0))
+    old_price = float(ing.get("price_per_unit", 0))
+    new_stock = old_stock + data.qty
+    if new_stock > 0:
+        new_price = (old_stock * old_price + data.qty * data.price_per_unit) / new_stock
+    else:
+        new_price = data.price_per_unit
+    await db.ingredients.update_one(
+        {"id": data.ingredient_id},
+        {"$set": {"stock": new_stock, "price_per_unit": new_price, "updated_at": now_iso()}}
+    )
+    purchase = Purchase(
+        ingredient_id=data.ingredient_id,
+        ingredient_name=ing["name"],
+        qty=data.qty,
+        price_per_unit=data.price_per_unit,
+        total_cost=total,
+        date=data.date,
+        supplier=data.supplier,
+        notes=data.notes,
+    )
+    await db.purchases.insert_one(purchase.model_dump())
+    return purchase
+
+
+@api_router.delete("/purchases/{pid}")
+async def delete_purchase(pid: str):
+    pur = await db.purchases.find_one({"id": pid}, {"_id": 0})
+    if not pur:
+        raise HTTPException(status_code=404, detail="Not found")
+    # rollback stock (gak rollback harga karena moving avg susah dikomposisi)
+    await db.ingredients.update_one(
+        {"id": pur["ingredient_id"]},
+        {"$inc": {"stock": -pur["qty"]}}
+    )
+    await db.purchases.delete_one({"id": pid})
+    return {"ok": True}
+
+
+# ============== Customers ==============
+class Customer(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+    id: str = Field(default_factory=new_id)
+    name: str
+    phone: Optional[str] = None
+    address: Optional[str] = None
+    customer_type: str = "regular"  # regular, catering, corporate
+    notes: Optional[str] = None
+    created_at: str = Field(default_factory=now_iso)
+
+
+class CustomerCreate(BaseModel):
+    name: str
+    phone: Optional[str] = None
+    address: Optional[str] = None
+    customer_type: str = "regular"
+    notes: Optional[str] = None
+
+
+@api_router.get("/customers")
+async def list_customers():
+    docs = await db.customers.find({}, {"_id": 0}).sort("name", 1).to_list(1000)
+    return docs
+
+
+@api_router.post("/customers")
+async def create_customer(data: CustomerCreate):
+    obj = Customer(**data.model_dump())
+    await db.customers.insert_one(obj.model_dump())
+    return obj
+
+
+@api_router.put("/customers/{cid}")
+async def update_customer(cid: str, data: CustomerCreate):
+    await db.customers.update_one({"id": cid}, {"$set": data.model_dump()})
+    doc = await db.customers.find_one({"id": cid}, {"_id": 0})
+    return doc
+
+
+@api_router.delete("/customers/{cid}")
+async def delete_customer(cid: str):
+    await db.customers.delete_one({"id": cid})
+    return {"ok": True}
+
+
+# ============== Reports: P&L, Break-Even, Promo ROI ==============
+@api_router.get("/reports/pnl")
+async def pnl_report(month: str):
+    """month format: YYYY-MM. Computes real P&L for the month."""
+    start = f"{month}-01"
+    # find end of month
+    year, mon = int(month[:4]), int(month[5:7])
+    if mon == 12:
+        next_m = f"{year + 1}-01-01"
+    else:
+        next_m = f"{year}-{mon + 1:02d}-01"
+    end_date = (datetime.fromisoformat(next_m) - timedelta(days=1)).date().isoformat()
+
+    sales = await db.sales.find({"date": {"$gte": start, "$lte": end_date}}, {"_id": 0}).to_list(10000)
+    revenue = sum(s["total"] for s in sales)
+    cogs = sum(s["total_hpp"] for s in sales)
+    gross_profit = revenue - cogs
+
+    op = await db.operating_costs.find({"date": {"$gte": start, "$lte": end_date}}, {"_id": 0}).to_list(1000)
+    op_total = sum(o["amount"] for o in op)
+    op_by_cat = defaultdict(float)
+    for o in op:
+        op_by_cat[o["category"]] += o["amount"]
+
+    net_profit = gross_profit - op_total
+    net_margin_pct = (net_profit / revenue * 100) if revenue > 0 else 0
+
+    return {
+        "month": month,
+        "start_date": start,
+        "end_date": end_date,
+        "revenue": revenue,
+        "cogs": cogs,
+        "gross_profit": gross_profit,
+        "gross_margin_pct": (gross_profit / revenue * 100) if revenue > 0 else 0,
+        "operating_costs_total": op_total,
+        "operating_costs_by_category": [{"category": k, "amount": v} for k, v in op_by_cat.items()],
+        "net_profit": net_profit,
+        "net_margin_pct": net_margin_pct,
+        "total_orders": len(sales),
+    }
+
+
+@api_router.get("/reports/break-even")
+async def break_even(fixed_cost: float, menu_id: Optional[str] = None):
+    """Hitung jumlah porsi minimum per hari & per bulan untuk balik modal."""
+    # if menu specified, use that profit/unit; else use weighted avg from sales last 30d
+    profit_per_unit = 0
+    avg_price = 0
+    if menu_id:
+        menu = await db.menus.find_one({"id": menu_id}, {"_id": 0})
+        if menu:
+            c = await compute_hpp(menu)
+            profit_per_unit = c["profit_per_unit"]
+            avg_price = c["selling_price"]
+    else:
+        end = datetime.now(timezone.utc).date()
+        start = end - timedelta(days=30)
+        sales = await db.sales.find({"date": {"$gte": start.isoformat()}}, {"_id": 0}).to_list(5000)
+        total_qty = sum(sum(it["qty"] for it in s["items"]) for s in sales)
+        total_profit = sum(s["profit"] for s in sales)
+        total_rev = sum(s["total"] for s in sales)
+        profit_per_unit = (total_profit / total_qty) if total_qty > 0 else 0
+        avg_price = (total_rev / total_qty) if total_qty > 0 else 0
+
+    if profit_per_unit <= 0:
+        return {"error": "Profit per unit 0 atau negatif. Tambahkan data atau pilih menu.", "porsi_per_bulan": None, "porsi_per_hari": None}
+
+    porsi_bulan = fixed_cost / profit_per_unit
+    return {
+        "fixed_cost": fixed_cost,
+        "profit_per_unit": profit_per_unit,
+        "avg_price": avg_price,
+        "porsi_per_bulan": porsi_bulan,
+        "porsi_per_hari": porsi_bulan / 30,
+        "revenue_target_per_bulan": porsi_bulan * avg_price,
+    }
+
+
+@api_router.get("/reports/promo-roi")
+async def promo_roi(menu_id: str, discount_pct: float):
+    """Hitung berapa porsi extra harus terjual setelah kasih diskon."""
+    menu = await db.menus.find_one({"id": menu_id}, {"_id": 0})
+    if not menu:
+        raise HTTPException(status_code=404, detail="Menu not found")
+    c = await compute_hpp(menu)
+    normal_price = c["selling_price"]
+    normal_profit = c["profit_per_unit"]
+    promo_price = normal_price * (1 - discount_pct / 100)
+    fee_pct = float(menu.get("platform_fee_pct", 0)) / 100
+    promo_net = promo_price * (1 - fee_pct)
+    promo_profit = promo_net - c["hpp"]
+
+    if promo_profit <= 0:
+        multiplier = None
+        warning = "⚠️ Promo ini bikin RUGI per porsi! Jangan diteruskan."
+    elif normal_profit <= 0:
+        multiplier = None
+        warning = "Menu ini belum profitable normal."
+    else:
+        multiplier = normal_profit / promo_profit
+        warning = None
+
+    return {
+        "menu_id": menu_id,
+        "menu_name": menu["name"],
+        "normal_price": normal_price,
+        "normal_profit_per_unit": normal_profit,
+        "discount_pct": discount_pct,
+        "promo_price": promo_price,
+        "promo_profit_per_unit": promo_profit,
+        "extra_volume_multiplier": multiplier,
+        "warning": warning,
+    }
 
 
 # ============== Dashboard ==============

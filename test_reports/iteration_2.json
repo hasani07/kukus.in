@@ -1,0 +1,41 @@
+{
+  "summary": "Backend new endpoints (operating-costs, purchases, customers, reports) and moving-avg formula verified working. CRITICAL frontend compile failure in Menus.jsx blocks ALL UI testing — duplicated/stray JSX after the function's closing brace (lines 361-369) causes a SyntaxError so the entire app won't load.",
+  "tested_scope": ["backend", "frontend", "integration"],
+  "passed": [
+    "POST/GET /api/operating-costs create+list works (Listrik Feb 500000 returned)",
+    "POST /api/purchases moving-avg verified: before stock=800 price=15, after qty=200 price=25 → ingredient updated to stock=1000 price=17.0 (matches (800*15+200*25)/1000=17)",
+    "POST/PUT/GET /api/customers CRUD works (created+updated+listed)",
+    "GET /api/reports/pnl?month=2026-02 returns full schema with revenue=48000, cogs=16200, gross_margin_pct=66.25, operating_costs_total=500000, net_profit=-468200, operating_costs_by_category populated",
+    "GET /api/reports/break-even with menu_id returns porsi_per_bulan/porsi_per_hari/revenue_target; null menu_id falls back to avg (avg_price=12800)",
+    "GET /api/reports/promo-roi at 20% returns extra_volume_multiplier=1.496; at 80% returns warning + multiplier null (negative profit handling correct)",
+    "Menu HPP formula with yield_per_batch=4 verified: (3400+1000+500)/4 + 500 = 1725 ✓ matches computed.hpp; packaging stays per porsi"
+  ],
+  "failed": [
+    {
+      "area": "Frontend / Menus.jsx",
+      "issue": "BLOCKER: Frontend fails to compile. SyntaxError at /app/frontend/src/pages/Menus.jsx line 365: 'Adjacent JSX elements must be wrapped in an enclosing tag'. Lines 361-369 contain stray duplicated JSX (DialogFooter/DialogContent/Dialog/div + extra closing brace) AFTER the component function already closed at line 360. Entire SPA shows red 'Compiled with problems' overlay — no nav items render, no route works.",
+      "evidence": "Webpack overlay: 'ERROR in ./src/pages/Menus.jsx ... (365:8)'. File lines 358-369 show duplicate JSX block after first `}` on line 360.",
+      "priority": "HIGH"
+    },
+    {
+      "area": "Backend / Menu computed.psychological_prices",
+      "issue": "Returns only 2 suggestions instead of the 3 specified in the spec. Got [5500, 5900] for recommended_price=5500. Endings (500, 900) are valid; count off by one.",
+      "evidence": "GET /api/menus → computed.psychological_prices = [5500, 5900]",
+      "priority": "LOW"
+    },
+    {
+      "area": "Frontend (all pages)",
+      "issue": "Could not verify any frontend testids (nav-dashboard..nav-settings, add-opcost-btn, add-purchase-btn, add-customer-btn, menu-yield-input, psych-price-* buttons) because the build is broken. All 11 nav lookups returned false.",
+      "evidence": "Playwright query_selector for every nav-* testid returned null while compile-error overlay is visible",
+      "priority": "HIGH"
+    }
+  ],
+  "action_items": [
+    "Delete the stray duplicated JSX block in /app/frontend/src/pages/Menus.jsx lines 361-369 (everything after the first `}` on line 360 down to the second `}` on line 369). The component already correctly closes at line 360.",
+    "After the fix, re-run full frontend verification (sidebar 11 nav items, OpCosts/Purchases/Customers add dialogs, Reports 3 tabs, menu-yield-input + psych-price-<value> buttons).",
+    "(Optional) Add a third entry to computed.psychological_prices so the array length matches spec (3 suggestions)."
+  ],
+  "success_rate": {"backend": "95%", "frontend": "0% (build broken)"},
+  "retest_needed": true,
+  "full_testing_deferred": true
+}

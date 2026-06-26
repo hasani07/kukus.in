@@ -9,6 +9,10 @@ import {
   Settings as SettingsIcon,
   Menu as MenuIcon,
   X,
+  Wallet,
+  ShoppingCart,
+  Users,
+  LineChart,
 } from "lucide-react";
 import { useState } from "react";
 
@@ -18,6 +22,10 @@ const navItems = [
   { to: "/packaging", label: "Packaging", icon: Package, testId: "nav-packaging" },
   { to: "/menu", label: "Menu & HPP", icon: UtensilsCrossed, testId: "nav-menus" },
   { to: "/penjualan", label: "Penjualan", icon: ShoppingBag, testId: "nav-sales" },
+  { to: "/belanja", label: "Belanja & Restock", icon: ShoppingCart, testId: "nav-purchases" },
+  { to: "/biaya-operasional", label: "Biaya Operasional", icon: Wallet, testId: "nav-opcosts" },
+  { to: "/customer", label: "Customer", icon: Users, testId: "nav-customers" },
+  { to: "/laporan", label: "Laporan & Analisis", icon: LineChart, testId: "nav-reports" },
   { to: "/invoice", label: "Invoice", icon: FileText, testId: "nav-invoices" },
   { to: "/pengaturan", label: "Pengaturan", icon: SettingsIcon, testId: "nav-settings" },
 ];

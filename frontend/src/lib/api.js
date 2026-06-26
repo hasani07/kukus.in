@@ -41,5 +41,26 @@ export const deleteInvoice = (id) => api.delete(`/invoices/${id}`).then((r) => r
 export const fetchSettings = () => api.get("/settings").then((r) => r.data);
 export const updateSettings = (data) => api.put("/settings", data).then((r) => r.data);
 
+// Operating Costs
+export const fetchOpCosts = () => api.get("/operating-costs").then((r) => r.data);
+export const createOpCost = (data) => api.post("/operating-costs", data).then((r) => r.data);
+export const deleteOpCost = (id) => api.delete(`/operating-costs/${id}`).then((r) => r.data);
+
+// Purchases
+export const fetchPurchases = () => api.get("/purchases").then((r) => r.data);
+export const createPurchase = (data) => api.post("/purchases", data).then((r) => r.data);
+export const deletePurchase = (id) => api.delete(`/purchases/${id}`).then((r) => r.data);
+
+// Customers
+export const fetchCustomers = () => api.get("/customers").then((r) => r.data);
+export const createCustomer = (data) => api.post("/customers", data).then((r) => r.data);
+export const updateCustomer = (id, data) => api.put(`/customers/${id}`, data).then((r) => r.data);
+export const deleteCustomer = (id) => api.delete(`/customers/${id}`).then((r) => r.data);
+
+// Reports
+export const fetchPnL = (month) => api.get("/reports/pnl", { params: { month } }).then((r) => r.data);
+export const fetchBreakEven = (fixed_cost, menu_id) => api.get("/reports/break-even", { params: { fixed_cost, menu_id } }).then((r) => r.data);
+export const fetchPromoRoi = (menu_id, discount_pct) => api.get("/reports/promo-roi", { params: { menu_id, discount_pct } }).then((r) => r.data);
+
 // Dashboard
 export const fetchDashboard = (period = "30d") => api.get("/dashboard/stats", { params: { period } }).then((r) => r.data);

@@ -10,6 +10,10 @@ import Sales from "@/pages/Sales";
 import Invoices from "@/pages/Invoices";
 import InvoicePrint from "@/pages/InvoicePrint";
 import SettingsPage from "@/pages/SettingsPage";
+import OperatingCosts from "@/pages/OperatingCosts";
+import Purchases from "@/pages/Purchases";
+import Customers from "@/pages/Customers";
+import Reports from "@/pages/Reports";
 
 function App() {
   return (
@@ -24,6 +28,10 @@ function App() {
             <Route path="/packaging" element={<Packaging />} />
             <Route path="/menu" element={<Menus />} />
             <Route path="/penjualan" element={<Sales />} />
+            <Route path="/belanja" element={<Purchases />} />
+            <Route path="/biaya-operasional" element={<OperatingCosts />} />
+            <Route path="/customer" element={<Customers />} />
+            <Route path="/laporan" element={<Reports />} />
             <Route path="/invoice" element={<Invoices />} />
             <Route path="/pengaturan" element={<SettingsPage />} />
           </Route>
