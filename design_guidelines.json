@@ -1,0 +1,124 @@
+{
+  "theme": "light",
+  "archetype": "Archetype 1: Organic & Earthy",
+  "rationale": "Kukus.In is a healthy steamed food merchant. Their financial dashboard should reflect trust, health, and groundedness. A dark 'crypto-bro' or overly clinical 'Swiss' UI would feel out of place. We use warm beige, sage greens, and terracotta to evoke food and organic materials, while keeping the data presentation crisp and highly legible.",
+  "colors": {
+    "background": "#FDFBF7",
+    "surface": "#FFFFFF",
+    "surface_secondary": "#F4F1EA",
+    "primary": {
+      "DEFAULT": "#4A6750",
+      "hover": "#3B5340",
+      "light": "#E9EFEA"
+    },
+    "secondary": {
+      "DEFAULT": "#D17B60",
+      "hover": "#BA6A51",
+      "light": "#FAEDE9"
+    },
+    "text": {
+      "primary": "#2D3A30",
+      "secondary": "#6B756D",
+      "muted": "#A1A8A3"
+    },
+    "border": "#E5E2DC",
+    "status": {
+      "success": "#34D399",
+      "warning": "#FBBF24",
+      "danger": "#EF4444",
+      "info": "#3B82F6"
+    }
+  },
+  "typography": {
+    "fonts": {
+      "heading": "Manrope, sans-serif",
+      "body": "IBM Plex Sans, sans-serif"
+    },
+    "hierarchy": {
+      "h1": "text-4xl sm:text-5xl font-extrabold tracking-tight text-[#2D3A30] leading-none",
+      "h2": "text-2xl sm:text-3xl font-bold tracking-tight text-[#2D3A30]",
+      "h3": "text-xl sm:text-2xl font-semibold text-[#2D3A30]",
+      "h4": "text-lg sm:text-xl font-semibold text-[#2D3A30]",
+      "body": "text-base font-normal text-[#6B756D] leading-relaxed",
+      "small": "text-sm font-medium text-[#6B756D]",
+      "overline": "text-xs font-bold uppercase tracking-[0.2em] text-[#A1A8A3]"
+    }
+  },
+  "spacing_and_layout": {
+    "philosophy": "Mode B: The 'Control Room' Grid for Dashboards. High density but clear separation. Generous padding inside containers.",
+    "container_padding": "p-6 sm:p-8",
+    "gap_strategy": "gap-4 sm:gap-6",
+    "border_radius": "rounded-lg",
+    "shadows": {
+      "sm": "shadow-[0_1px_2px_rgba(45,58,48,0.05)]",
+      "md": "shadow-[0_4px_6px_-1px_rgba(45,58,48,0.05)]",
+      "lg": "shadow-[0_10px_15px_-3px_rgba(45,58,48,0.05)]"
+    },
+    "surface_styles": {
+      "card": "bg-white border border-[#E5E2DC] rounded-lg shadow-sm hover:shadow-md transition-shadow duration-200",
+      "sidebar": "bg-[#F4F1EA] border-r border-[#E5E2DC]"
+    }
+  },
+  "components": {
+    "buttons": {
+      "primary": "bg-[#4A6750] text-white hover:bg-[#3B5340] font-semibold px-4 py-2 rounded-md transition-colors",
+      "secondary": "bg-[#F4F1EA] text-[#2D3A30] hover:bg-[#E5E2DC] font-medium px-4 py-2 rounded-md transition-colors",
+      "outline": "border border-[#E5E2DC] text-[#2D3A30] hover:bg-[#F4F1EA] font-medium px-4 py-2 rounded-md transition-colors",
+      "danger": "bg-red-50 text-red-600 hover:bg-red-100 font-medium px-4 py-2 rounded-md transition-colors"
+    },
+    "inputs": "bg-white border border-[#E5E2DC] text-[#2D3A30] rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[#4A6750] focus:border-transparent",
+    "tables": "w-full text-left text-sm text-[#6B756D] border-collapse",
+    "table_header": "bg-[#F4F1EA] font-semibold text-[#2D3A30] py-3 px-4 uppercase text-xs tracking-wider",
+    "table_cell": "border-b border-[#E5E2DC] py-3 px-4",
+    "badges": "inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium"
+  },
+  "icons": {
+    "library": "@phosphor-icons/react",
+    "rationale": "Phosphor Icons provide a clean, legible, and slightly organic line-weight that fits the dashboard's balance of numbers and food."
+  },
+  "animations": {
+    "hover": "transition-all duration-200 ease-in-out",
+    "focus": "focus:ring-2 focus:ring-offset-1 focus:ring-[#4A6750] transition-shadow duration-200",
+    "list_stagger": "framer-motion with staggerChildren: 0.05, easing: 'easeOut'"
+  },
+  "accessibility": {
+    "contrast": "All text must meet minimum 4.5:1 ratio. The selected text colors (#2D3A30 and #6B756D) against #FDFBF7 and #FFFFFF exceed this.",
+    "focus_states": "Visible focus rings on all interactive elements.",
+    "data_testid_guidelines": "All interactive elements MUST include data-testid (e.g., data-testid='add-ingredient-btn', data-testid='save-recipe-btn', data-testid='sidebar-nav-sales')."
+  },
+  "media_and_images": {
+    "guidelines": "Images should be used sparingly as this is a financial dashboard. Mostly used for empty states, login screens, or placeholder menu item thumbnails.",
+    "image_urls": [
+      {
+        "url": "https://images.unsplash.com/photo-1546069901-ba9599a7e63c?crop=entropy&cs=srgb&fm=jpg&ixid=M3w3NTY2NjZ8MHwxfHNlYXJjaHwyfHxzdGVhbWVkJTIwaGVhbHRoeSUyMGZvb2QlMjBib3dsfGVufDB8fHx8MTc4MjQ2MTIyN3ww&ixlib=rb-4.1.0&q=85",
+        "description": "Steamed healthy food bowl with vegetables and meat.",
+        "category": "menu_placeholder"
+      },
+      {
+        "url": "https://images.pexels.com/photos/3298780/pexels-photo-3298780.jpeg?auto=compress&cs=tinysrgb&dpr=2&h=650&w=940",
+        "description": "Steaming healthy edamame beans in a dark bowl.",
+        "category": "menu_placeholder"
+      },
+      {
+        "url": "https://images.pexels.com/photos/5202206/pexels-photo-5202206.jpeg?auto=compress&cs=tinysrgb&dpr=2&h=650&w=940",
+        "description": "Colorful fresh organic vegetables flatlay.",
+        "category": "background_login_or_empty_state"
+      }
+    ]
+  },
+  "pages_and_features": {
+    "Dashboard": "North Star metrics row (Pendapatan, Laba Bersih, Estimasi Margin). Include charts for sales trends and best-selling menus.",
+    "Bahan_Baku_dan_Packaging": "Table view to manage ingredient names, unit of measurement (kg, gr, pcs), and price per unit. Visual indicator for low stock.",
+    "Resep_dan_HPP": "Builder interface. Select an item, add ingredients from 'Bahan Baku'. System auto-calculates total HPP. Input target margin (%) and ShopeeFood fee (%), system recommends Selling Price (Harga Jual).",
+    "Penjualan": "Daily/monthly transaction log. Form to add new sales. Syncs to deduct stock automatically based on Recipe ingredients.",
+    "Invoice": "Generate clean, minimalist PDF invoices or printable views for catering/bulk orders or monthly reports."
+  },
+  "instructions_to_main_agent": [
+    "Install required dependencies: `yarn add @phosphor-icons/react recharts framer-motion`.",
+    "Use standard Tailwind HTML elements for layout structure. Use Shadcn components for complex interactions like dialogs, tables, and selects.",
+    "Enforce the 'Control Room' dense grid for the dashboard layout.",
+    "Apply `data-testid` to EVERY button, link, and form input without exception.",
+    "Maintain the Indonesian language ('Pendapatan', 'Bahan Baku', 'Harga Jual') for all text elements.",
+    "Do not use generic blue/indigo default Tailwind colors. Strictly adhere to the organic palette (#4A6750, #D17B60, #FDFBF7, etc.)."
+  ]
+}
