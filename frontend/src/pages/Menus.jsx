@@ -358,12 +358,3 @@ export default function Menus() {
     </div>
   );
 }
-      <DialogFooter>
-            <Button variant="outline" onClick={() => setOpen(false)} data-testid="menu-cancel-btn">Batal</Button>
-            <Button onClick={save} className="bg-[#4A6750] hover:bg-[#3B5340] text-white" data-testid="menu-save-btn">Simpan Menu</Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-    </div>
-  );
-}

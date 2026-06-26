@@ -1,0 +1,28 @@
+{
+  "summary": "Frontend retest after Menus.jsx compile fix. App loads cleanly with no compile overlay. All 11 nav items present and clickable. All 4 new routes (/biaya-operasional, /belanja, /customer, /laporan) navigate correctly. Add flows for OpCost and Customer verified. Laporan tabs (pnl/breakeven/promo) render with their inputs/buttons. Menu Edit dialog shows 3 psychological_prices buttons (psych-price-5500, 5900, 6500) confirming backend change. ONE issue: data-testid 'menu-yield-input' is NOT present on the menu dialog (other testids exist: name/desc/image/labor/overhead/margin/fee).",
+  "tested_scope": ["frontend", "integration"],
+  "passed": [
+    "App loads, title 'Emergent | Fullstack App', no webpack compile overlay",
+    "All 11 nav items present (dashboard, ingredients, packaging, menus, sales, purchases, opcosts, customers, reports, invoices, settings)",
+    "Routes navigate correctly: /biaya-operasional, /belanja, /customer, /laporan",
+    "OpCost add flow: add-opcost-btn + opcost-save-btn produces row",
+    "Customer add flow: add-customer-btn + customer-save-btn produces card",
+    "Laporan tabs tab-pnl, tab-breakeven (fixed-cost input present), tab-promo (promo-calc-btn present) all functional",
+    "Menu dialog shows 3 psychological_prices: psych-price-5500, psych-price-5900, psych-price-6500 (backend fix confirmed via UI)",
+    "Zero console errors during navigation"
+  ],
+  "failed": [
+    {
+      "area": "Menus.jsx",
+      "issue": "Required data-testid 'menu-yield-input' not present on Edit/Add Menu dialog. Dialog only exposes: menu-name-input, menu-desc-input, menu-image-input, menu-labor-input, menu-overhead-input, menu-margin-input, menu-fee-input, menu-use-rec-switch, menu-cancel-btn, menu-save-btn.",
+      "evidence": "page.evaluate of data-testids inside open dialog returned no 'yield' testid; spec required menu-yield-input field.",
+      "priority": "MEDIUM"
+    }
+  ],
+  "action_items": [
+    "Add 'Yield' (porsi per resep) input with data-testid='menu-yield-input' to the menu dialog in Menus.jsx, or update spec if yield was descoped."
+  ],
+  "success_rate": {"backend": "not retested (UI confirms 3 psych prices)", "frontend": "92%"},
+  "retest_needed": false,
+  "full_testing_deferred": true
+}

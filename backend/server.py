@@ -268,16 +268,18 @@ async def compute_hpp(menu: dict) -> dict:
     profit_per_unit = net_per_unit - hpp
     profit_margin_pct = (profit_per_unit / net_per_unit * 100) if net_per_unit > 0 else 0
 
-    # Psychological price suggestions
+    # Psychological price suggestions (3 options)
     psych_prices = []
     if recommended_price > 0:
         base = int(recommended_price)
-        # ujung 900, 500, 000
-        psych_prices = sorted(set([
-            ((base // 1000) * 1000) + 900,
+        candidates = sorted(set([
             ((base // 1000) * 1000) + 500,
+            ((base // 1000) * 1000) + 900,
             ((base // 1000 + 1) * 1000) - 100,
+            ((base // 1000 + 1) * 1000) + 500,
         ]))
+        # Pick 3 closest >= recommended_price - 200
+        psych_prices = [c for c in candidates if c >= recommended_price - 200][:3]
 
     return {
         "ingredients_cost": ingredients_cost,
