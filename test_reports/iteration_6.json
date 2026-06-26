@@ -1,0 +1,17 @@
+{
+  "summary": "Backend pricing-formula bug fix verified. /api/menus/preview-hpp now returns recommended_price = hpp/(1-margin) (no double fee), and platform_prices net_received ≈ base_price within rounding tolerance.",
+  "tested_scope": ["backend"],
+  "passed": [
+    "POST /api/menus/preview-hpp with empty ingredients/packaging, labor=5000, overhead=2000, margin=60, offline=0 → HPP=7000, recommended_price=17500 (= 7000/0.4 rounded to 500) ✓",
+    "Same payload: profit_per_unit=10500 (=17500-7000), profit_margin_pct=60.0% ✓ (formula now uses selling-hpp not net-hpp)",
+    "Platform net_received ≈ recommended_price when offline=0: shopeefood=17500 (fee 65%), gofood=17670 (fee 38%), grabfood=17600 (fee 20%) — all within ±500 rounding of 17500 ✓",
+    "With offline_price=25000, margin=60: recommended_price still 17500 (margin-based), platform base_price uses 25000 — net_received: 25025/25110/25200 (≈25000) ✓",
+    "Regression: GET /api/menus → 200, GET /api/dashboard/stats → 200, GET /api/sales → 200"
+  ],
+  "failed": [],
+  "action_items": [],
+  "success_rate": {"backend": "100%", "frontend": "not tested (cosmetic label only, per request)"},
+  "retest_needed": false,
+  "full_testing_deferred": true,
+  "notes": "Math invariant holds: net_received from each platform_price ≈ base_price (offline_price if set, else recommended_price). Settings has non-default fees (shopeefood=65/gofood=38/grabfood=20) but invariant verified regardless. The fix correctly decouples offline recommendation from platform fee. Note: '/api/sales/preview' endpoint does not exist in the codebase — verified GET /api/sales instead."
+}

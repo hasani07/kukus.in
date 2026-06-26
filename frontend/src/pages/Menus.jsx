@@ -324,9 +324,9 @@ export default function Menus() {
                       <span className="font-bold text-[#2D3A30]">{formatIDR(preview.hpp)}</span>
                     </div>
                     <div className="bg-white rounded-md p-3 border border-[#E5E2DC] mt-4">
-                      <p className="text-xs uppercase tracking-wider text-[#A1A8A3] mb-1">Rekomendasi Harga Jual</p>
+                      <p className="text-xs uppercase tracking-wider text-[#A1A8A3] mb-1">Rekomendasi Harga Offline</p>
                       <p className="text-2xl font-extrabold text-[#4A6750]">{formatIDR(preview.recommended_price)}</p>
-                      <p className="text-xs text-[#6B756D] mt-1">setelah fee {form.platform_fee_pct}% + margin {form.margin_target_pct}%</p>
+                      <p className="text-xs text-[#6B756D] mt-1">HPP + margin {form.margin_target_pct}% (belum termasuk fee platform)</p>
                       {preview.psychological_prices?.length > 0 && (
                         <div className="mt-3 pt-3 border-t border-[#E5E2DC]">
                           <p className="text-xs uppercase tracking-wider text-[#A1A8A3] mb-1">💡 Harga Psikologis</p>
