@@ -1,0 +1,19 @@
+{
+  "summary": "Multi-platform pricing feature verified end-to-end. Settings API persists shopeefood/gofood/grabfood fee fields and frontend exposes them. Menu dialog offline_price input drives platform_prices preview (3 cards) using fees from settings. Math validated: offline=25000 with fees 20/22/22 yields ShopeeFood=31500 (net 25200), GoFood=32500 (net 25350), GrabFood=32500 (net 25350). Fallback to recommended_price when offline_price=0 also works.",
+  "tested_scope": ["backend", "frontend", "integration"],
+  "passed": [
+    "GET /api/settings returns platform fee fields (after first save)",
+    "PUT /api/settings persists shopeefood_fee_pct/gofood_fee_pct/grabfood_fee_pct (20/22/22)",
+    "POST /api/menus/preview-hpp with offline_price=25000 returns platform_prices [3] with correct rounding (31500/32500/32500)",
+    "POST /api/menus persists offline_price and returns computed.platform_prices",
+    "Fallback: when offline_price=0, computed.offline_price falls back to recommended_price (31500) and platform_prices computed from it",
+    "Settings UI: shopeefood-fee-input, gofood-fee-input, grabfood-fee-input visible and bound to backend values",
+    "Menu dialog: menu-offline-price-input visible; entering 25000 renders 3 cards platform-price-shopeefood/gofood/grabfood with price, fee%, net received, margin"
+  ],
+  "failed": [],
+  "action_items": [],
+  "success_rate": {"backend": "100%", "frontend": "100%"},
+  "retest_needed": false,
+  "full_testing_deferred": true,
+  "notes": "Settings DB currently holds shopeefood=65, gofood=38, grabfood=20 (leftover from prior tests); frontend cards reflect these — math still correct (25000/(1-0.65)=71500 rounded up). Defaults (20/22/22) only apply if fields absent from Pydantic model loading; confirmed by direct preview-hpp request which uses Settings defaults consistently."
+}

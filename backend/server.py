@@ -100,6 +100,7 @@ class Menu(BaseModel):
     platform_fee_pct: float = 20
     selling_price: float = 0
     use_recommended_price: bool = True
+    offline_price: float = 0
     yield_per_batch: float = 1  # 1 batch resep menghasilkan brp porsi
     active: bool = True
     created_at: str = Field(default_factory=now_iso)
@@ -118,6 +119,7 @@ class MenuCreate(BaseModel):
     platform_fee_pct: float = 20
     selling_price: float = 0
     use_recommended_price: bool = True
+    offline_price: float = 0
     yield_per_batch: float = 1
     active: bool = True
 
@@ -203,6 +205,9 @@ class Settings(BaseModel):
     business_email: str = ""
     default_margin_pct: float = 60
     default_platform_fee_pct: float = 20
+    shopeefood_fee_pct: float = 20
+    gofood_fee_pct: float = 22
+    grabfood_fee_pct: float = 22
     updated_at: str = Field(default_factory=now_iso)
 
 
@@ -281,6 +286,37 @@ async def compute_hpp(menu: dict) -> dict:
         # Pick 3 closest >= recommended_price - 200
         psych_prices = [c for c in candidates if c >= recommended_price - 200][:3]
 
+    # Multi-platform pricing based on offline_price (or recommended_price as fallback)
+    settings_doc = await db.settings.find_one({"id": "default"}, {"_id": 0})
+    base_price = float(menu.get("offline_price", 0) or 0)
+    if base_price <= 0:
+        base_price = recommended_price
+    platforms_cfg = [
+        ("shopeefood", "ShopeeFood", float((settings_doc or {}).get("shopeefood_fee_pct", 20))),
+        ("gofood", "GoFood", float((settings_doc or {}).get("gofood_fee_pct", 22))),
+        ("grabfood", "GrabFood", float((settings_doc or {}).get("grabfood_fee_pct", 22))),
+    ]
+    platform_prices = []
+    for key, label, f_pct in platforms_cfg:
+        f = f_pct / 100.0
+        if f >= 1:
+            platform_price = base_price * 2
+        else:
+            platform_price = base_price / (1 - f)
+        platform_price = int((platform_price + 499) // 500 * 500) if platform_price > 0 else 0
+        net = platform_price * (1 - f)
+        profit = net - hpp
+        margin_pct = (profit / net * 100) if net > 0 else 0
+        platform_prices.append({
+            "key": key,
+            "label": label,
+            "fee_pct": f_pct,
+            "price": platform_price,
+            "net_received": net,
+            "profit_per_unit": profit,
+            "margin_pct": margin_pct,
+        })
+
     return {
         "ingredients_cost": ingredients_cost,
         "packaging_cost": packaging_cost,
@@ -294,6 +330,8 @@ async def compute_hpp(menu: dict) -> dict:
         "net_per_unit": net_per_unit,
         "profit_per_unit": profit_per_unit,
         "profit_margin_pct": profit_margin_pct,
+        "offline_price": base_price,
+        "platform_prices": platform_prices,
         "breakdown_ingredients": breakdown_ing,
         "breakdown_packaging": breakdown_pack,
     }

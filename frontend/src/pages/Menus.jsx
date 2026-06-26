@@ -21,6 +21,7 @@ const emptyMenu = {
   labor_cost: 0, overhead_cost: 0,
   margin_target_pct: 60, platform_fee_pct: 20,
   selling_price: 0, use_recommended_price: true, yield_per_batch: 1, active: true,
+  offline_price: 0,
 };
 
 export default function Menus() {
@@ -54,6 +55,7 @@ export default function Menus() {
           selling_price: Number(form.selling_price) || 0,
           use_recommended_price: form.use_recommended_price,
           yield_per_batch: Number(form.yield_per_batch) || 1,
+          offline_price: Number(form.offline_price) || 0,
         });
         setPreview(p);
       } catch (err) {
@@ -84,6 +86,8 @@ export default function Menus() {
       margin_target_pct: Number(form.margin_target_pct) || 0,
       platform_fee_pct: Number(form.platform_fee_pct) || 0,
       selling_price: Number(form.selling_price) || 0,
+      offline_price: Number(form.offline_price) || 0,
+      yield_per_batch: Number(form.yield_per_batch) || 1,
     };
     try {
       if (editingId) await updateMenu(editingId, payload);
@@ -275,6 +279,11 @@ export default function Menus() {
               </div>
 
               <div className="grid grid-cols-2 gap-3 pt-2 border-t border-[#E5E2DC]">
+                <div className="col-span-2">
+                  <Label className="text-base font-semibold text-[#4A6750]">💵 Harga Jual Offline / Cash / Dine-In</Label>
+                  <Input type="number" value={form.offline_price} onChange={(e) => setForm({ ...form, offline_price: e.target.value })} placeholder="contoh: 25000" data-testid="menu-offline-price-input" />
+                  <p className="text-xs text-[#6B756D] mt-1">Sistem auto-hitung harga jual ShopeeFood/GoFood/GrabFood biar net-mu sama dengan offline.</p>
+                </div>
                 <div><Label>Yield per Batch (porsi)</Label><Input type="number" value={form.yield_per_batch} onChange={(e) => setForm({ ...form, yield_per_batch: e.target.value })} data-testid="menu-yield-input" /></div>
                 <div className="flex items-end text-xs text-[#6B756D]">1 resep → {form.yield_per_batch || 1} porsi. Bahan/labor auto dibagi.</div>
                 <div><Label>Biaya Tenaga Kerja / pcs</Label><Input type="number" value={form.labor_cost} onChange={(e) => setForm({ ...form, labor_cost: e.target.value })} data-testid="menu-labor-input" /></div>
@@ -347,6 +356,24 @@ export default function Menus() {
                         <p className="font-bold text-[#2D3A30]">{(preview.profit_margin_pct || 0).toFixed(1)}%</p>
                       </div>
                     </div>
+                    {preview.platform_prices?.length > 0 && (
+                      <div className="mt-4 pt-3 border-t border-[#E5E2DC]">
+                        <p className="text-xs uppercase tracking-wider text-[#A1A8A3] mb-2">🚀 Harga Jual per Platform</p>
+                        <div className="space-y-2">
+                          {preview.platform_prices.map((p) => (
+                            <div key={p.key} className="bg-white rounded-md p-2 border border-[#E5E2DC]" data-testid={`platform-price-${p.key}`}>
+                              <div className="flex justify-between items-center">
+                                <div>
+                                  <p className="text-xs font-bold text-[#2D3A30]">{p.label} <span className="text-[#A1A8A3] font-normal">· fee {p.fee_pct}%</span></p>
+                                  <p className="text-[10px] text-[#6B756D]">Net: {formatIDR(p.net_received)} · Margin: {p.margin_pct.toFixed(1)}%</p>
+                                </div>
+                                <p className="text-base font-extrabold text-[#4A6750]">{formatIDR(p.price)}</p>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
                   </div>
                 )}
               </div>

@@ -20,6 +20,9 @@ export default function SettingsPage() {
         ...form,
         default_margin_pct: Number(form.default_margin_pct),
         default_platform_fee_pct: Number(form.default_platform_fee_pct),
+        shopeefood_fee_pct: Number(form.shopeefood_fee_pct ?? 20),
+        gofood_fee_pct: Number(form.gofood_fee_pct ?? 22),
+        grabfood_fee_pct: Number(form.grabfood_fee_pct ?? 22),
       });
       toast.success("Pengaturan tersimpan");
     } catch { toast.error("Gagal menyimpan"); }
@@ -44,10 +47,20 @@ export default function SettingsPage() {
 
           <div className="pt-5 border-t border-[#E5E2DC]">
             <h3 className="font-bold text-[#2D3A30] mb-3">Default Kalkulasi HPP</h3>
-            <p className="text-xs text-[#6B756D] mb-4">Nilai ini dipakai sebagai default saat buat menu baru. Untuk ShopeeFood biasanya komisi ~20%, GoFood/GrabFood sekitar 20-22%.</p>
+            <p className="text-xs text-[#6B756D] mb-4">Nilai ini dipakai sebagai default saat buat menu baru.</p>
             <div className="grid grid-cols-2 gap-3">
               <div><Label>Default Margin Target (%)</Label><Input type="number" value={form.default_margin_pct} onChange={(e) => setForm({ ...form, default_margin_pct: e.target.value })} data-testid="default-margin-input" /></div>
               <div><Label>Default Fee Platform (%)</Label><Input type="number" value={form.default_platform_fee_pct} onChange={(e) => setForm({ ...form, default_platform_fee_pct: e.target.value })} data-testid="default-fee-input" /></div>
+            </div>
+          </div>
+
+          <div className="pt-5 border-t border-[#E5E2DC]">
+            <h3 className="font-bold text-[#2D3A30] mb-3">Fee per Platform Delivery</h3>
+            <p className="text-xs text-[#6B756D] mb-4">Komisi tiap platform delivery. Sistem akan auto-hitung harga jual di tiap platform supaya net-mu sama dengan harga offline.</p>
+            <div className="grid grid-cols-3 gap-3">
+              <div><Label>🛒 ShopeeFood (%)</Label><Input type="number" value={form.shopeefood_fee_pct ?? 20} onChange={(e) => setForm({ ...form, shopeefood_fee_pct: e.target.value })} data-testid="shopeefood-fee-input" /></div>
+              <div><Label>🟢 GoFood (%)</Label><Input type="number" value={form.gofood_fee_pct ?? 22} onChange={(e) => setForm({ ...form, gofood_fee_pct: e.target.value })} data-testid="gofood-fee-input" /></div>
+              <div><Label>🟩 GrabFood (%)</Label><Input type="number" value={form.grabfood_fee_pct ?? 22} onChange={(e) => setForm({ ...form, grabfood_fee_pct: e.target.value })} data-testid="grabfood-fee-input" /></div>
             </div>
           </div>
 
