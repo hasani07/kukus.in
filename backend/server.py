@@ -341,7 +341,7 @@ async def compute_hpp(menu: dict) -> dict:
         "selling_price": selling,
         "profit_per_unit": offline_profit_per_unit,
         "profit_margin_pct": offline_margin_pct_actual,
-        "offline_price": base_price,
+        "offline_price": selling,
         "platform_prices": platform_prices,
         "breakdown_ingredients": breakdown_ing,
         "breakdown_packaging": breakdown_pack,
