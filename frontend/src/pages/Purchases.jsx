@@ -9,13 +9,26 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Plus, Trash2, ShoppingCart } from "lucide-react";
+import { Plus, Trash2, ShoppingCart, ChevronLeft, ChevronRight } from "lucide-react";
 import { toast } from "sonner";
+
+const MONTH_NAMES = ["Januari","Februari","Maret","April","Mei","Juni","Juli","Agustus","September","Oktober","November","Desember"];
+
+function monthLabel(ym) {
+  const [y, m] = ym.split("-");
+  return `${MONTH_NAMES[Number(m) - 1]} ${y}`;
+}
+function shiftMonth(ym, delta) {
+  const [y, m] = ym.split("-").map(Number);
+  const d = new Date(y, m - 1 + delta);
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+}
 
 export default function Purchases() {
   const [items, setItems] = useState([]);
   const [ings, setIngs] = useState([]);
   const [open, setOpen] = useState(false);
+  const [month, setMonth] = useState(todayISO().slice(0, 7));
   const [form, setForm] = useState({ ingredient_id: "", qty: 0, price_per_unit: 0, date: todayISO(), supplier: "", notes: "" });
 
   const load = async () => {
@@ -37,7 +50,10 @@ export default function Purchases() {
     setOpen(false); load();
   };
 
-  const total = items.reduce((s, i) => s + i.total_cost, 0);
+  const thisMonthISO = todayISO().slice(0, 7);
+  const canNext = month < thisMonthISO;
+  const filtered = items.filter((i) => i.date.startsWith(month));
+  const total = filtered.reduce((s, i) => s + i.total_cost, 0);
 
   return (
     <div className="p-6 sm:p-10 max-w-[1400px]">
@@ -45,14 +61,24 @@ export default function Purchases() {
         subtitle="Catat tiap pembelian bahan. Sistem auto update stok & harga rata-rata (moving average) — HPP selalu akurat."
         action={<Button onClick={openCreate} className="bg-[#4A6750] hover:bg-[#3B5340] text-white" data-testid="add-purchase-btn" disabled={ings.length === 0}><Plus size={16} className="mr-2" /> Catat Belanja</Button>} />
 
+      {/* Month Picker */}
+      <div className="flex items-center gap-3 mb-5">
+        <Button variant="outline" size="sm" onClick={() => setMonth(shiftMonth(month, -1))} className="px-2"><ChevronLeft size={16} /></Button>
+        <span className="font-semibold text-[#2D3A30] min-w-[150px] text-center">{monthLabel(month)}</span>
+        <Button variant="outline" size="sm" onClick={() => setMonth(shiftMonth(month, 1))} disabled={!canNext} className="px-2"><ChevronRight size={16} /></Button>
+        {month !== thisMonthISO && (
+          <Button variant="ghost" size="sm" onClick={() => setMonth(thisMonthISO)} className="text-xs text-[#4A6750]">Bulan Ini</Button>
+        )}
+      </div>
+
       <Card className="border-[#E5E2DC] mb-6"><CardContent className="p-5">
-        <p className="text-xs uppercase tracking-[0.2em] text-[#A1A8A3] mb-1">Total Pengeluaran Belanja</p>
+        <p className="text-xs uppercase tracking-[0.2em] text-[#A1A8A3] mb-1">Total Belanja {monthLabel(month)}</p>
         <p className="text-3xl font-extrabold text-[#2D3A30]">{formatIDR(total)}</p>
-        <p className="text-xs text-[#6B756D] mt-1">{items.length} transaksi belanja tercatat</p>
+        <p className="text-xs text-[#6B756D] mt-1">{filtered.length} transaksi</p>
       </CardContent></Card>
 
-      {items.length === 0 ? (
-        <EmptyState icon={ShoppingCart} title="Belum ada belanja tercatat"
+      {filtered.length === 0 ? (
+        <EmptyState icon={ShoppingCart} title={`Belum ada belanja di ${monthLabel(month)}`}
           description="Setiap belanja bahan, catat di sini. Stok otomatis bertambah & harga rata-rata terhitung supaya HPP selalu akurat."
           action={ings.length > 0 ? <Button onClick={openCreate} className="bg-[#4A6750] hover:bg-[#3B5340] text-white" data-testid="empty-add-purchase-btn">Catat Belanja</Button> : <p className="text-xs text-[#D17B60]">Tambah bahan baku dulu</p>} />
       ) : (
@@ -67,7 +93,7 @@ export default function Purchases() {
               <th className="text-left py-3 px-4 font-semibold uppercase text-xs tracking-wider">Supplier</th>
               <th className="text-right py-3 px-4 w-12"></th>
             </tr></thead>
-            <tbody>{items.map((p) => (
+            <tbody>{filtered.map((p) => (
               <tr key={p.id} className="border-b border-[#E5E2DC] hover:bg-[#FDFBF7]" data-testid={`purchase-row-${p.id}`}>
                 <td className="py-3 px-4 text-[#6B756D]">{formatDate(p.date)}</td>
                 <td className="py-3 px-4 font-medium text-[#2D3A30]">{p.ingredient_name}</td>

@@ -10,7 +10,7 @@ import { Label } from "@/components/ui/label";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
-import { Plus, Trash2, Wallet } from "lucide-react";
+import { Plus, Trash2, Wallet, ChevronLeft, ChevronRight } from "lucide-react";
 import { toast } from "sonner";
 
 const CATEGORIES = [
@@ -24,9 +24,22 @@ const CATEGORIES = [
   { v: "other", label: "Lainnya" },
 ];
 
+const MONTH_NAMES = ["Januari","Februari","Maret","April","Mei","Juni","Juli","Agustus","September","Oktober","November","Desember"];
+
+function monthLabel(ym) {
+  const [y, m] = ym.split("-");
+  return `${MONTH_NAMES[Number(m) - 1]} ${y}`;
+}
+function shiftMonth(ym, delta) {
+  const [y, m] = ym.split("-").map(Number);
+  const d = new Date(y, m - 1 + delta);
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+}
+
 export default function OperatingCosts() {
   const [items, setItems] = useState([]);
   const [open, setOpen] = useState(false);
+  const [month, setMonth] = useState(todayISO().slice(0, 7));
   const [form, setForm] = useState({ name: "", category: "rent", amount: 0, frequency: "monthly", date: todayISO(), notes: "" });
 
   const load = async () => setItems(await fetchOpCosts());
@@ -36,33 +49,62 @@ export default function OperatingCosts() {
     if (!form.name.trim()) { toast.error("Nama wajib"); return; }
     await createOpCost({ ...form, amount: Number(form.amount) });
     toast.success("Biaya tercatat");
-    setOpen(false); setForm({ name: "", category: "rent", amount: 0, frequency: "monthly", date: todayISO(), notes: "" });
+    setOpen(false);
+    setForm({ name: "", category: "rent", amount: 0, frequency: "monthly", date: todayISO(), notes: "" });
     load();
   };
 
-  const monthly = items.filter((i) => i.frequency === "monthly").reduce((s, i) => s + i.amount, 0);
-  const thisMonth = todayISO().slice(0, 7);
-  const thisMonthTotal = items.filter((i) => i.date.startsWith(thisMonth)).reduce((s, i) => s + i.amount, 0);
+  const thisMonthISO = todayISO().slice(0, 7);
+  const canNext = month < thisMonthISO;
+  const filtered = items.filter((i) => i.date.startsWith(month));
+  const total = filtered.reduce((s, i) => s + i.amount, 0);
+  const byCategory = CATEGORIES.map((c) => ({
+    ...c,
+    total: filtered.filter((i) => i.category === c.v).reduce((s, i) => s + i.amount, 0),
+  })).filter((c) => c.total > 0);
 
   return (
     <div className="p-6 sm:p-10 max-w-[1400px]">
-      <PageHeader testId="opcosts-page" title="Biaya Operasional" subtitle="Catat semua biaya non-bahan (sewa, listrik, gaji, marketing). Wajib untuk laporan laba-rugi yang akurat."
+      <PageHeader testId="opcosts-page" title="Biaya Operasional"
+        subtitle="Catat semua biaya non-bahan (sewa, listrik, gaji, marketing). Wajib untuk laporan laba-rugi yang akurat."
         action={<Button onClick={() => setOpen(true)} className="bg-[#4A6750] hover:bg-[#3B5340] text-white" data-testid="add-opcost-btn"><Plus size={16} className="mr-2" /> Tambah Biaya</Button>} />
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-6">
-        <Card className="border-[#E5E2DC]"><CardContent className="p-5">
-          <p className="text-xs uppercase tracking-[0.2em] text-[#A1A8A3] mb-1">Biaya Bulan Ini</p>
-          <p className="text-3xl font-extrabold text-[#2D3A30]">{formatIDR(thisMonthTotal)}</p>
-        </CardContent></Card>
-        <Card className="border-[#E5E2DC]"><CardContent className="p-5">
-          <p className="text-xs uppercase tracking-[0.2em] text-[#A1A8A3] mb-1">Total Biaya Rutin Bulanan</p>
-          <p className="text-3xl font-extrabold text-[#D17B60]">{formatIDR(monthly)}</p>
-        </CardContent></Card>
+      {/* Month Picker */}
+      <div className="flex items-center gap-3 mb-5">
+        <Button variant="outline" size="sm" onClick={() => setMonth(shiftMonth(month, -1))} className="px-2"><ChevronLeft size={16} /></Button>
+        <span className="font-semibold text-[#2D3A30] min-w-[150px] text-center">{monthLabel(month)}</span>
+        <Button variant="outline" size="sm" onClick={() => setMonth(shiftMonth(month, 1))} disabled={!canNext} className="px-2"><ChevronRight size={16} /></Button>
+        {month !== thisMonthISO && (
+          <Button variant="ghost" size="sm" onClick={() => setMonth(thisMonthISO)} className="text-xs text-[#4A6750]">Bulan Ini</Button>
+        )}
       </div>
 
-      {items.length === 0 ? (
-        <EmptyState icon={Wallet} title="Belum ada biaya tercatat" description="Mulai catat sewa, listrik, gaji, dll. Tanpa data ini, profit di dashboard belum mencerminkan untung beneran."
-          action={<Button onClick={() => setOpen(true)} className="bg-[#4A6750] hover:bg-[#3B5340] text-white" data-testid="empty-add-opcost-btn">Tambah Biaya Pertama</Button>} />
+      {/* Summary cards */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-6">
+        <Card className="border-[#E5E2DC]"><CardContent className="p-5">
+          <p className="text-xs uppercase tracking-[0.2em] text-[#A1A8A3] mb-1">Total Biaya {monthLabel(month)}</p>
+          <p className="text-3xl font-extrabold text-[#2D3A30]">{formatIDR(total)}</p>
+          <p className="text-xs text-[#6B756D] mt-1">{filtered.length} item tercatat</p>
+        </CardContent></Card>
+        {byCategory.length > 0 && (
+          <Card className="border-[#E5E2DC]"><CardContent className="p-5">
+            <p className="text-xs uppercase tracking-[0.2em] text-[#A1A8A3] mb-2">Per Kategori</p>
+            <div className="space-y-1">
+              {byCategory.map((c) => (
+                <div key={c.v} className="flex justify-between text-sm">
+                  <span className="text-[#6B756D]">{c.label}</span>
+                  <span className="font-semibold text-[#2D3A30]">{formatIDR(c.total)}</span>
+                </div>
+              ))}
+            </div>
+          </CardContent></Card>
+        )}
+      </div>
+
+      {filtered.length === 0 ? (
+        <EmptyState icon={Wallet} title={`Belum ada biaya di ${monthLabel(month)}`}
+          description="Mulai catat sewa, listrik, gaji, dll. Tanpa data ini, profit di dashboard belum mencerminkan untung beneran."
+          action={<Button onClick={() => setOpen(true)} className="bg-[#4A6750] hover:bg-[#3B5340] text-white" data-testid="empty-add-opcost-btn">Tambah Biaya</Button>} />
       ) : (
         <Card className="border-[#E5E2DC]"><CardContent className="p-0">
           <div className="overflow-x-auto"><table className="w-full text-sm">
@@ -74,7 +116,7 @@ export default function OperatingCosts() {
               <th className="text-right py-3 px-4 font-semibold uppercase text-xs tracking-wider">Jumlah</th>
               <th className="text-right py-3 px-4 w-12"></th>
             </tr></thead>
-            <tbody>{items.map((i) => (
+            <tbody>{filtered.map((i) => (
               <tr key={i.id} className="border-b border-[#E5E2DC] hover:bg-[#FDFBF7]" data-testid={`opcost-row-${i.id}`}>
                 <td className="py-3 px-4 text-[#6B756D]">{formatDate(i.date)}</td>
                 <td className="py-3 px-4 font-medium text-[#2D3A30]">{i.name}</td>
