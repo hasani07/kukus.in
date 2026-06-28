@@ -59,7 +59,7 @@ function PnLTab({ defaultMonth }) {
             <Row label="Pendapatan (Revenue)" value={data.revenue} positive />
             <Row label="HPP (Cost of Goods Sold)" value={-data.cogs} />
             <Row label="LABA KOTOR (Gross Profit)" value={data.gross_profit} bold border />
-            <p className="text-xs text-[#6B756D] -mt-1">Margin Kotor: {data.gross_margin_pct.toFixed(1)}%</p>
+            <p className="text-xs text-[#6B756D] -mt-1">Margin Kotor: {(data.gross_margin_pct ?? 0).toFixed(1)}%</p>
 
             <div className="pt-4 mt-4 border-t border-[#E5E2DC]">
               <p className="text-xs uppercase tracking-wider text-[#A1A8A3] mb-2">Biaya Operasional</p>
@@ -73,7 +73,7 @@ function PnLTab({ defaultMonth }) {
 
             <div className="pt-4 mt-4 border-t-2 border-[#2D3A30]">
               <Row label="LABA BERSIH (Net Profit)" value={data.net_profit} bold xl positive={data.net_profit > 0} negative={data.net_profit < 0} />
-              <p className="text-sm text-[#6B756D] mt-1">Net Margin: <span className={data.net_margin_pct > 0 ? "text-[#4A6750] font-bold" : "text-[#D17B60] font-bold"}>{data.net_margin_pct.toFixed(1)}%</span> · {data.total_orders} order</p>
+              <p className="text-sm text-[#6B756D] mt-1">Net Margin: <span className={data.net_margin_pct > 0 ? "text-[#4A6750] font-bold" : "text-[#D17B60] font-bold"}>{(data.net_margin_pct ?? 0).toFixed(1)}%</span> · {data.total_orders} order</p>
             </div>
           </div>
         </CardContent></Card>
@@ -183,7 +183,7 @@ function PromoTab({ menus }) {
               </div>
             ) : (
               <div className="p-3 bg-[#E9EFEA] rounded-md border border-[#4A6750]">
-                <p className="text-sm text-[#2D3A30]">Supaya promo tetap untung sama seperti tanpa promo, harus jual <span className="font-bold text-[#4A6750]">{result.extra_volume_multiplier.toFixed(2)}x</span> lebih banyak.</p>
+                <p className="text-sm text-[#2D3A30]">Supaya promo tetap untung sama seperti tanpa promo, harus jual <span className="font-bold text-[#4A6750]">{(result.extra_volume_multiplier ?? 0).toFixed(2)}x</span> lebih banyak.</p>
                 <p className="text-xs text-[#6B756D] mt-1">Contoh: kalau normal jual 10 porsi → harus laku {Math.ceil(10 * result.extra_volume_multiplier)} porsi saat promo.</p>
               </div>
             )}

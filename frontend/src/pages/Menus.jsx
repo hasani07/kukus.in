@@ -365,7 +365,7 @@ export default function Menus() {
                               <div className="flex justify-between items-center">
                                 <div>
                                   <p className="text-xs font-bold text-[#2D3A30]">{p.label} <span className="text-[#A1A8A3] font-normal">· fee {p.fee_pct}%</span></p>
-                                  <p className="text-[10px] text-[#6B756D]">Net: {formatIDR(p.net_received)} · Margin: {p.margin_pct.toFixed(1)}%</p>
+                                  <p className="text-[10px] text-[#6B756D]">Net: {formatIDR(p.net_received)} · Margin: {(p.margin_pct ?? 0).toFixed(1)}%</p>
                                 </div>
                                 <p className="text-base font-extrabold text-[#4A6750]">{formatIDR(p.price)}</p>
                               </div>

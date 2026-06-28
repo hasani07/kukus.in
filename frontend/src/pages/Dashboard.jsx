@@ -61,7 +61,7 @@ export default function Dashboard() {
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6 mb-8">
             <Stat icon={Wallet} label="Pendapatan Bersih" value={formatIDR(data.total_revenue)} hint={`${data.total_orders} order`} />
             <Stat icon={TrendingUp} label="Laba Bersih" value={formatIDR(data.total_profit)} hint={`HPP: ${formatIDR(data.total_hpp)}`} accent="bg-[#FAEDE9] text-[#D17B60]" />
-            <Stat icon={Percent} label="Margin" value={`${data.margin_pct.toFixed(1)}%`} hint="terhadap pendapatan bersih" />
+            <Stat icon={Percent} label="Margin" value={`${(data.margin_pct ?? 0).toFixed(1)}%`} hint="terhadap pendapatan bersih" />
             <Stat icon={ShoppingBag} label="Item Terjual" value={formatNumber(data.total_items_sold)} hint="total qty" accent="bg-[#FAEDE9] text-[#D17B60]" />
           </div>
 
