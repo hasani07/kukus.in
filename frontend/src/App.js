@@ -1,4 +1,5 @@
 import "@/App.css";
+import { useEffect } from "react";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { Toaster } from "sonner";
 import Layout from "@/components/Layout";
@@ -16,15 +17,32 @@ import Customers from "@/pages/Customers";
 import Reports from "@/pages/Reports";
 import LoginPage from "@/pages/LoginPage";
 import { isAuthenticated } from "@/lib/auth";
+import { fetchDashboard, fetchIngredients, fetchPackaging, fetchMenus, fetchSettings } from "@/lib/api";
 
 function RequireAuth({ children }) {
   return isAuthenticated() ? children : <Navigate to="/login" replace />;
+}
+
+function AppWarmup() {
+  useEffect(() => {
+    if (!isAuthenticated()) return;
+    // Warm up serverless function + prefetch data yang paling sering dipakai
+    Promise.allSettled([
+      fetchDashboard(),
+      fetchIngredients(),
+      fetchPackaging(),
+      fetchMenus(),
+      fetchSettings(),
+    ]);
+  }, []);
+  return null;
 }
 
 function App() {
   return (
     <div className="App">
       <BrowserRouter>
+        <AppWarmup />
         <Routes>
           <Route path="/login" element={<LoginPage />} />
           <Route path="/invoice/:id/print" element={<InvoicePrint />} />
