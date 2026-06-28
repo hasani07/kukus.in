@@ -10,7 +10,6 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Switch } from "@/components/ui/switch";
 import { Badge } from "@/components/ui/badge";
 import { Plus, Pencil, Trash2, UtensilsCrossed, X, Sparkles, Store, Smartphone } from "lucide-react";
 import { toast } from "sonner";
@@ -21,15 +20,27 @@ const PLATFORM_COLOR = {
   grabfood: "text-[#00B14F]",
 };
 
+const PLATFORM_BG = {
+  shopeefood: "bg-[#FFF3F0] border-[#EE4D2D]/20",
+  gofood: "bg-[#F0FFF2] border-[#00AA13]/20",
+  grabfood: "bg-[#F0FFF5] border-[#00B14F]/20",
+};
+
 const emptyMenu = {
   name: "", description: "", image_url: "",
   ingredients: [], packaging: [],
   labor_cost: 0, overhead_cost: 0,
-  margin_target_pct: 60,
   offline_margin_pct: 40,
-  platform_fee_pct: 20,
-  selling_price: 0, use_recommended_price: true, yield_per_batch: 1, active: true,
   offline_price: 0,
+  shopeefood_net_target: 0,
+  gofood_net_target: 0,
+  grabfood_net_target: 0,
+  margin_target_pct: 60,
+  platform_fee_pct: 20,
+  selling_price: 0,
+  use_recommended_price: true,
+  yield_per_batch: 1,
+  active: true,
 };
 
 export default function Menus() {
@@ -47,7 +58,6 @@ export default function Menus() {
   };
   useEffect(() => { load(); }, []);
 
-  // Live preview HPP
   useEffect(() => {
     if (!open) return;
     const t = setTimeout(async () => {
@@ -58,13 +68,16 @@ export default function Menus() {
           packaging: form.packaging,
           labor_cost: Number(form.labor_cost) || 0,
           overhead_cost: Number(form.overhead_cost) || 0,
-          margin_target_pct: Number(form.margin_target_pct) || 0,
           offline_margin_pct: Number(form.offline_margin_pct) || 0,
+          offline_price: Number(form.offline_price) || 0,
+          shopeefood_net_target: Number(form.shopeefood_net_target) || 0,
+          gofood_net_target: Number(form.gofood_net_target) || 0,
+          grabfood_net_target: Number(form.grabfood_net_target) || 0,
+          margin_target_pct: Number(form.margin_target_pct) || 0,
           platform_fee_pct: Number(form.platform_fee_pct) || 0,
           selling_price: Number(form.selling_price) || 0,
           use_recommended_price: form.use_recommended_price,
           yield_per_batch: Number(form.yield_per_batch) || 1,
-          offline_price: Number(form.offline_price) || 0,
         });
         setPreview(p);
       } catch (err) {
@@ -76,16 +89,19 @@ export default function Menus() {
 
   const openCreate = async () => {
     const s = await fetchSettings();
-    setForm({
-      ...emptyMenu,
-      offline_margin_pct: s.default_margin_pct ?? 40,
-      margin_target_pct: s.default_margin_pct ?? 60,
-    });
+    setForm({ ...emptyMenu, offline_margin_pct: s.default_margin_pct ?? 40 });
     setEditingId(null);
     setOpen(true);
   };
+
   const openEdit = (m) => {
-    setForm({ ...emptyMenu, ...m, offline_margin_pct: m.offline_margin_pct ?? m.margin_target_pct ?? 40 });
+    setForm({
+      ...emptyMenu, ...m,
+      offline_margin_pct: m.offline_margin_pct ?? m.margin_target_pct ?? 40,
+      shopeefood_net_target: m.shopeefood_net_target ?? 0,
+      gofood_net_target: m.gofood_net_target ?? 0,
+      grabfood_net_target: m.grabfood_net_target ?? 0,
+    });
     setEditingId(m.id);
     setOpen(true);
   };
@@ -96,11 +112,14 @@ export default function Menus() {
       ...form,
       labor_cost: Number(form.labor_cost) || 0,
       overhead_cost: Number(form.overhead_cost) || 0,
-      margin_target_pct: Number(form.margin_target_pct) || 0,
       offline_margin_pct: Number(form.offline_margin_pct) || 0,
+      offline_price: Number(form.offline_price) || 0,
+      shopeefood_net_target: Number(form.shopeefood_net_target) || 0,
+      gofood_net_target: Number(form.gofood_net_target) || 0,
+      grabfood_net_target: Number(form.grabfood_net_target) || 0,
+      margin_target_pct: Number(form.margin_target_pct) || 0,
       platform_fee_pct: Number(form.platform_fee_pct) || 0,
       selling_price: Number(form.selling_price) || 0,
-      offline_price: Number(form.offline_price) || 0,
       yield_per_batch: Number(form.yield_per_batch) || 1,
     };
     try {
@@ -113,17 +132,15 @@ export default function Menus() {
 
   const remove = async (id) => {
     if (!confirm("Hapus menu ini?")) return;
-    await deleteMenu(id);
-    toast.success("Dihapus");
-    load();
+    await deleteMenu(id); toast.success("Dihapus"); load();
   };
 
   const addIng = () => {
-    if (ingredients.length === 0) { toast.error("Tambah Bahan Baku dulu di halaman Bahan Baku"); return; }
+    if (ingredients.length === 0) { toast.error("Tambah Bahan Baku dulu"); return; }
     setForm({ ...form, ingredients: [...form.ingredients, { ingredient_id: ingredients[0].id, qty: 0 }] });
   };
   const addPack = () => {
-    if (packaging.length === 0) { toast.error("Tambah Packaging dulu di halaman Packaging"); return; }
+    if (packaging.length === 0) { toast.error("Tambah Packaging dulu"); return; }
     setForm({ ...form, packaging: [...form.packaging, { packaging_id: packaging[0].id, qty: 1 }] });
   };
 
@@ -131,7 +148,7 @@ export default function Menus() {
     <div className="p-6 sm:p-10 max-w-[1400px]">
       <PageHeader
         title="Menu & HPP"
-        subtitle="Susun resep tiap menu, sistem auto-hitung HPP & harga jual terpisah untuk offline dan tiap platform delivery."
+        subtitle="Susun resep, atur harga offline & target bersih tiap platform secara terpisah."
         testId="menus-page"
         action={
           <Button onClick={openCreate} className="bg-[#4A6750] hover:bg-[#3B5340] text-white" data-testid="add-menu-btn">
@@ -144,7 +161,7 @@ export default function Menus() {
         <EmptyState
           icon={UtensilsCrossed}
           title="Belum ada menu"
-          description="Tambah menu pertamamu! Pilih bahan, tentukan margin offline & fee platform, biarkan sistem hitung harga jual optimal."
+          description="Tambah menu pertamamu! Atur harga offline dan target net tiap platform."
           action={<Button onClick={openCreate} className="bg-[#4A6750] hover:bg-[#3B5340] text-white" data-testid="empty-add-menu-btn">Buat Menu Pertama</Button>}
         />
       ) : (
@@ -168,26 +185,26 @@ export default function Menus() {
                     {!m.active && <Badge variant="outline" className="text-[#6B756D]">Nonaktif</Badge>}
                   </div>
 
-                  {/* HPP + Offline */}
                   <div className="grid grid-cols-2 gap-2 pt-2 border-t border-[#E5E2DC]">
                     <div>
                       <p className="text-xs text-[#A1A8A3] uppercase tracking-wider">HPP</p>
                       <p className="font-bold text-[#2D3A30]">{formatIDR(m.computed?.hpp)}</p>
                     </div>
                     <div>
-                      <div className="flex items-center gap-1 mb-0.5">
+                      <div className="flex items-center gap-1">
                         <Store size={10} className="text-[#4A6750]" />
-                        <p className="text-xs text-[#A1A8A3] uppercase tracking-wider">Offline / Cash</p>
+                        <p className="text-xs text-[#A1A8A3] uppercase tracking-wider">Offline</p>
                       </div>
                       <p className="font-bold text-[#4A6750]">{formatIDR(m.computed?.offline_price)}</p>
-                      <p className="text-[10px] text-[#6B756D]">margin {(m.computed?.profit_margin_pct || 0).toFixed(0)}% · profit {formatIDR(m.computed?.profit_per_unit)}</p>
+                      <p className="text-[10px] text-[#6B756D]">
+                        margin {(m.computed?.profit_margin_pct || 0).toFixed(0)}% · profit {formatIDR(m.computed?.profit_per_unit)}
+                      </p>
                     </div>
                   </div>
 
-                  {/* Platform prices */}
                   {m.computed?.platform_prices?.length > 0 && (
                     <div className="pt-2 border-t border-[#E5E2DC]">
-                      <div className="flex items-center gap-1 mb-2">
+                      <div className="flex items-center gap-1 mb-1.5">
                         <Smartphone size={10} className="text-[#6B756D]" />
                         <p className="text-xs text-[#A1A8A3] uppercase tracking-wider">Platform</p>
                       </div>
@@ -225,18 +242,15 @@ export default function Menus() {
           <DialogHeader><DialogTitle>{editingId ? "Edit Menu" : "Tambah Menu"}</DialogTitle></DialogHeader>
 
           <div className="grid grid-cols-1 lg:grid-cols-5 gap-6">
-            {/* Left: form inputs */}
             <div className="lg:col-span-3 space-y-4">
-              <div>
-                <Label>Nama Menu</Label>
+              {/* Info dasar */}
+              <div><Label>Nama Menu</Label>
                 <Input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} placeholder="Ayam Kukus Bumbu Kuning" data-testid="menu-name-input" />
               </div>
-              <div>
-                <Label>Deskripsi</Label>
+              <div><Label>Deskripsi</Label>
                 <Textarea rows={2} value={form.description || ""} onChange={(e) => setForm({ ...form, description: e.target.value })} data-testid="menu-desc-input" />
               </div>
-              <div>
-                <Label>URL Gambar (opsional)</Label>
+              <div><Label>URL Gambar (opsional)</Label>
                 <Input value={form.image_url || ""} onChange={(e) => setForm({ ...form, image_url: e.target.value })} placeholder="https://..." data-testid="menu-image-input" />
               </div>
 
@@ -244,9 +258,7 @@ export default function Menus() {
               <div className="pt-2 border-t border-[#E5E2DC]">
                 <div className="flex items-center justify-between mb-2">
                   <Label className="text-base font-semibold">Bahan Baku</Label>
-                  <Button size="sm" variant="outline" onClick={addIng} data-testid="add-recipe-ingredient-btn">
-                    <Plus size={14} className="mr-1" /> Tambah Bahan
-                  </Button>
+                  <Button size="sm" variant="outline" onClick={addIng} data-testid="add-recipe-ingredient-btn"><Plus size={14} className="mr-1" /> Tambah</Button>
                 </div>
                 {form.ingredients.length === 0 && <p className="text-xs text-[#6B756D]">Belum ada bahan.</p>}
                 <div className="space-y-2">
@@ -259,19 +271,13 @@ export default function Menus() {
                           setForm({ ...form, ingredients: next });
                         }}>
                           <SelectTrigger className="flex-1" data-testid={`recipe-ing-select-${idx}`}><SelectValue /></SelectTrigger>
-                          <SelectContent>
-                            {ingredients.map((i) => (<SelectItem key={i.id} value={i.id}>{i.name} ({i.unit})</SelectItem>))}
-                          </SelectContent>
+                          <SelectContent>{ingredients.map((i) => (<SelectItem key={i.id} value={i.id}>{i.name} ({i.unit})</SelectItem>))}</SelectContent>
                         </Select>
                         <Input type="number" value={ri.qty} className="w-24" placeholder="Qty"
-                          onChange={(e) => {
-                            const next = [...form.ingredients]; next[idx] = { ...next[idx], qty: Number(e.target.value) };
-                            setForm({ ...form, ingredients: next });
-                          }} data-testid={`recipe-ing-qty-${idx}`} />
+                          onChange={(e) => { const next = [...form.ingredients]; next[idx] = { ...next[idx], qty: Number(e.target.value) }; setForm({ ...form, ingredients: next }); }}
+                          data-testid={`recipe-ing-qty-${idx}`} />
                         <span className="text-xs text-[#6B756D] w-10">{ing?.unit}</span>
-                        <Button size="sm" variant="ghost" onClick={() => setForm({ ...form, ingredients: form.ingredients.filter((_, i) => i !== idx) })} data-testid={`recipe-ing-remove-${idx}`}>
-                          <X size={14} />
-                        </Button>
+                        <Button size="sm" variant="ghost" onClick={() => setForm({ ...form, ingredients: form.ingredients.filter((_, i) => i !== idx) })} data-testid={`recipe-ing-remove-${idx}`}><X size={14} /></Button>
                       </div>
                     );
                   })}
@@ -282,9 +288,7 @@ export default function Menus() {
               <div className="pt-2 border-t border-[#E5E2DC]">
                 <div className="flex items-center justify-between mb-2">
                   <Label className="text-base font-semibold">Packaging</Label>
-                  <Button size="sm" variant="outline" onClick={addPack} data-testid="add-recipe-packaging-btn">
-                    <Plus size={14} className="mr-1" /> Tambah Packaging
-                  </Button>
+                  <Button size="sm" variant="outline" onClick={addPack} data-testid="add-recipe-packaging-btn"><Plus size={14} className="mr-1" /> Tambah</Button>
                 </div>
                 {form.packaging.length === 0 && <p className="text-xs text-[#6B756D]">Belum ada packaging.</p>}
                 <div className="space-y-2">
@@ -295,19 +299,13 @@ export default function Menus() {
                         setForm({ ...form, packaging: next });
                       }}>
                         <SelectTrigger className="flex-1" data-testid={`recipe-pack-select-${idx}`}><SelectValue /></SelectTrigger>
-                        <SelectContent>
-                          {packaging.map((p) => (<SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>))}
-                        </SelectContent>
+                        <SelectContent>{packaging.map((p) => (<SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>))}</SelectContent>
                       </Select>
                       <Input type="number" value={rp.qty} className="w-24" placeholder="Qty"
-                        onChange={(e) => {
-                          const next = [...form.packaging]; next[idx] = { ...next[idx], qty: Number(e.target.value) };
-                          setForm({ ...form, packaging: next });
-                        }} data-testid={`recipe-pack-qty-${idx}`} />
+                        onChange={(e) => { const next = [...form.packaging]; next[idx] = { ...next[idx], qty: Number(e.target.value) }; setForm({ ...form, packaging: next }); }}
+                        data-testid={`recipe-pack-qty-${idx}`} />
                       <span className="text-xs text-[#6B756D] w-10">pcs</span>
-                      <Button size="sm" variant="ghost" onClick={() => setForm({ ...form, packaging: form.packaging.filter((_, i) => i !== idx) })} data-testid={`recipe-pack-remove-${idx}`}>
-                        <X size={14} />
-                      </Button>
+                      <Button size="sm" variant="ghost" onClick={() => setForm({ ...form, packaging: form.packaging.filter((_, i) => i !== idx) })} data-testid={`recipe-pack-remove-${idx}`}><X size={14} /></Button>
                     </div>
                   ))}
                 </div>
@@ -315,10 +313,16 @@ export default function Menus() {
 
               {/* Biaya produksi */}
               <div className="grid grid-cols-2 gap-3 pt-2 border-t border-[#E5E2DC]">
-                <div><Label>Yield per Batch (porsi)</Label><Input type="number" value={form.yield_per_batch} onChange={(e) => setForm({ ...form, yield_per_batch: e.target.value })} data-testid="menu-yield-input" /></div>
+                <div><Label>Yield per Batch (porsi)</Label>
+                  <Input type="number" value={form.yield_per_batch} onChange={(e) => setForm({ ...form, yield_per_batch: e.target.value })} data-testid="menu-yield-input" />
+                </div>
                 <div className="flex items-end text-xs text-[#6B756D]">1 resep → {form.yield_per_batch || 1} porsi. Bahan/labor auto dibagi.</div>
-                <div><Label>Biaya Tenaga Kerja / pcs</Label><Input type="number" value={form.labor_cost} onChange={(e) => setForm({ ...form, labor_cost: e.target.value })} data-testid="menu-labor-input" /></div>
-                <div><Label>Overhead (gas, listrik) / pcs</Label><Input type="number" value={form.overhead_cost} onChange={(e) => setForm({ ...form, overhead_cost: e.target.value })} data-testid="menu-overhead-input" /></div>
+                <div><Label>Biaya Tenaga Kerja / pcs</Label>
+                  <Input type="number" value={form.labor_cost} onChange={(e) => setForm({ ...form, labor_cost: e.target.value })} data-testid="menu-labor-input" />
+                </div>
+                <div><Label>Overhead (gas, listrik) / pcs</Label>
+                  <Input type="number" value={form.overhead_cost} onChange={(e) => setForm({ ...form, overhead_cost: e.target.value })} data-testid="menu-overhead-input" />
+                </div>
               </div>
 
               {/* Harga Offline */}
@@ -331,40 +335,62 @@ export default function Menus() {
                   <div>
                     <Label>Target Margin Offline (%)</Label>
                     <Input type="number" value={form.offline_margin_pct} onChange={(e) => setForm({ ...form, offline_margin_pct: e.target.value })} placeholder="40" data-testid="menu-offline-margin-input" />
-                    <p className="text-xs text-[#6B756D] mt-1">Profit dari harga jual offline</p>
+                    <p className="text-xs text-[#6B756D] mt-1">Sistem hitung rekomendasi harga</p>
                   </div>
                   <div>
-                    <Label>Harga Offline Manual (Rp)</Label>
-                    <Input type="number" value={form.offline_price} onChange={(e) => setForm({ ...form, offline_price: e.target.value })} placeholder="opsional, override rekomendasi" data-testid="menu-offline-price-input" />
-                    <p className="text-xs text-[#6B756D] mt-1">Kosongkan = pakai rekomendasi</p>
+                    <Label>Override Harga Offline (Rp)</Label>
+                    <Input type="number" value={form.offline_price || ""} onChange={(e) => setForm({ ...form, offline_price: e.target.value })} placeholder="kosong = pakai rekomendasi" data-testid="menu-offline-price-input" />
+                    <p className="text-xs text-[#6B756D] mt-1">Isi jika ingin paksa harga tertentu</p>
                   </div>
                 </div>
-                <div className="flex items-center justify-between pt-1">
-                  <div>
-                    <Label>Pakai Harga Rekomendasi untuk Online</Label>
-                    <p className="text-xs text-[#6B756D]">Jika nonaktif, atur harga platform manual.</p>
-                  </div>
-                  <Switch checked={form.use_recommended_price} onCheckedChange={(v) => setForm({ ...form, use_recommended_price: v })} data-testid="menu-use-rec-switch" />
-                </div>
-                {!form.use_recommended_price && (
-                  <div>
-                    <Label>Harga Jual Platform Manual (Rp)</Label>
-                    <Input type="number" value={form.selling_price} onChange={(e) => setForm({ ...form, selling_price: e.target.value })} data-testid="menu-manual-price-input" />
-                  </div>
-                )}
               </div>
 
-              {/* Platform info */}
-              <div className="pt-3 border-t border-[#E5E2DC]">
-                <div className="flex items-center gap-2 mb-2">
+              {/* Harga Platform */}
+              <div className="pt-3 border-t border-[#E5E2DC] space-y-3">
+                <div className="flex items-center gap-2">
                   <Smartphone size={15} className="text-[#6B756D]" />
-                  <Label className="text-base font-semibold text-[#6B756D]">Harga Platform</Label>
+                  <Label className="text-base font-semibold text-[#6B756D]">Target Bersih per Platform</Label>
                 </div>
-                <p className="text-xs text-[#6B756D]">Harga ShopeeFood, GoFood & GrabFood otomatis dihitung agar net yang kamu terima = harga offline. Fee tiap platform diatur di menu <span className="font-semibold">Pengaturan</span>.</p>
+                <p className="text-xs text-[#6B756D] -mt-1">Isi berapa yang ingin kamu terima (setelah dipotong fee platform). Sistem hitung harga jualnya otomatis. Kosongkan = sama dengan harga offline.</p>
+
+                {[
+                  { key: "shopeefood", label: "ShopeeFood", field: "shopeefood_net_target" },
+                  { key: "gofood", label: "GoFood", field: "gofood_net_target" },
+                  { key: "grabfood", label: "GrabFood", field: "grabfood_net_target" },
+                ].map(({ key, label, field }) => {
+                  const pData = preview?.platform_prices?.find((p) => p.key === key);
+                  return (
+                    <div key={key} className={`rounded-lg p-3 border ${PLATFORM_BG[key] || "bg-[#F4F1EA] border-[#E5E2DC]"}`}>
+                      <div className="flex items-center justify-between mb-2">
+                        <span className={`text-sm font-bold ${PLATFORM_COLOR[key]}`}>{label}</span>
+                        {pData && <span className="text-xs text-[#6B756D]">fee {pData.fee_pct}% dari harga jual</span>}
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <div className="flex-1">
+                          <Label className="text-xs text-[#6B756D]">Mau dapat bersih (Rp)</Label>
+                          <Input
+                            type="number"
+                            value={form[field] || ""}
+                            onChange={(e) => setForm({ ...form, [field]: e.target.value })}
+                            placeholder="kosong = sama dgn offline"
+                            data-testid={`menu-${field}-input`}
+                          />
+                        </div>
+                        {pData && (
+                          <div className="text-right min-w-[110px]">
+                            <p className="text-xs text-[#6B756D]">Harga jual</p>
+                            <p className="text-lg font-extrabold text-[#2D3A30]">{formatIDR(pData.price)}</p>
+                            <p className="text-xs text-[#6B756D]">bersih {formatIDR(pData.net_received)}</p>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
               </div>
             </div>
 
-            {/* Right: HPP calculator */}
+            {/* Right: HPP Calculator */}
             <div className="lg:col-span-2">
               <div className="bg-[#F4F1EA] rounded-lg p-5 sticky top-0 space-y-4">
                 <div className="flex items-center gap-2">
@@ -376,24 +402,23 @@ export default function Menus() {
                   <>
                     {/* Breakdown biaya */}
                     <div className="space-y-2 text-sm">
-                      <div className="flex justify-between"><span className="text-[#6B756D]">Bahan Baku</span><span className="font-medium text-[#2D3A30]">{formatIDR(preview.ingredients_cost)}</span></div>
-                      <div className="flex justify-between"><span className="text-[#6B756D]">Packaging</span><span className="font-medium text-[#2D3A30]">{formatIDR(preview.packaging_cost)}</span></div>
-                      <div className="flex justify-between"><span className="text-[#6B756D]">Tenaga Kerja</span><span className="font-medium text-[#2D3A30]">{formatIDR(preview.labor_cost)}</span></div>
-                      <div className="flex justify-between"><span className="text-[#6B756D]">Overhead</span><span className="font-medium text-[#2D3A30]">{formatIDR(preview.overhead_cost)}</span></div>
-                      <div className="flex justify-between border-t border-[#E5E2DC] pt-2">
-                        <span className="font-semibold text-[#2D3A30]">Total HPP</span>
-                        <span className="font-bold text-[#2D3A30]">{formatIDR(preview.hpp)}</span>
+                      <div className="flex justify-between"><span className="text-[#6B756D]">Bahan Baku</span><span className="font-medium">{formatIDR(preview.ingredients_cost)}</span></div>
+                      <div className="flex justify-between"><span className="text-[#6B756D]">Packaging</span><span className="font-medium">{formatIDR(preview.packaging_cost)}</span></div>
+                      <div className="flex justify-between"><span className="text-[#6B756D]">Tenaga Kerja</span><span className="font-medium">{formatIDR(preview.labor_cost)}</span></div>
+                      <div className="flex justify-between"><span className="text-[#6B756D]">Overhead</span><span className="font-medium">{formatIDR(preview.overhead_cost)}</span></div>
+                      <div className="flex justify-between border-t border-[#E5E2DC] pt-2 font-semibold">
+                        <span>Total HPP</span><span className="font-bold">{formatIDR(preview.hpp)}</span>
                       </div>
                     </div>
 
-                    {/* Offline section */}
+                    {/* Offline */}
                     <div className="bg-white rounded-md p-3 border border-[#4A6750]/30">
-                      <div className="flex items-center gap-1.5 mb-2">
+                      <div className="flex items-center gap-1.5 mb-1">
                         <Store size={12} className="text-[#4A6750]" />
-                        <p className="text-xs font-bold uppercase tracking-wider text-[#4A6750]">Offline / Cash / Dine-In</p>
+                        <p className="text-xs font-bold uppercase tracking-wider text-[#4A6750]">Offline / Cash</p>
                       </div>
                       <p className="text-2xl font-extrabold text-[#4A6750]">{formatIDR(preview.offline_price)}</p>
-                      <p className="text-xs text-[#6B756D] mt-1">
+                      <p className="text-xs text-[#6B756D] mt-0.5">
                         Profit: <span className="font-semibold text-[#2D3A30]">{formatIDR(preview.profit_per_unit)}</span>
                         {" · "}Margin: <span className="font-semibold text-[#2D3A30]">{(preview.profit_margin_pct || 0).toFixed(1)}%</span>
                       </p>
@@ -402,49 +427,38 @@ export default function Menus() {
                           <p className="text-xs text-[#A1A8A3] mb-1">💡 Harga Psikologis</p>
                           <div className="flex gap-1.5 flex-wrap">
                             {preview.psychological_prices.map((p) => (
-                              <button
-                                key={p}
-                                type="button"
+                              <button key={p} type="button"
                                 onClick={() => setForm({ ...form, offline_price: p })}
-                                className="text-xs px-2 py-1 bg-[#F4F1EA] hover:bg-[#E5E2DC] rounded text-[#2D3A30] font-mono"
-                                data-testid={`psych-price-${p}`}
-                              >
-                                {formatIDR(p)}
-                              </button>
+                                className="text-xs px-2 py-1 bg-[#F4F1EA] hover:bg-[#E5E2DC] rounded font-mono"
+                                data-testid={`psych-price-${p}`}>{formatIDR(p)}</button>
                             ))}
                           </div>
                         </div>
                       )}
                     </div>
 
-                    {/* Platform prices section */}
+                    {/* Platform summary */}
                     {preview.platform_prices?.length > 0 && (
-                      <div>
-                        <div className="flex items-center gap-1.5 mb-2">
+                      <div className="space-y-2">
+                        <div className="flex items-center gap-1.5">
                           <Smartphone size={12} className="text-[#6B756D]" />
-                          <p className="text-xs font-bold uppercase tracking-wider text-[#6B756D]">Harga Platform</p>
+                          <p className="text-xs font-bold uppercase tracking-wider text-[#6B756D]">Ringkasan Platform</p>
                         </div>
-                        <div className="space-y-2">
-                          {preview.platform_prices.map((p) => (
-                            <div key={p.key} className="bg-white rounded-md p-3 border border-[#E5E2DC]" data-testid={`platform-price-${p.key}`}>
-                              <div className="flex justify-between items-start">
-                                <div>
-                                  <p className={`text-xs font-bold ${PLATFORM_COLOR[p.key] || "text-[#2D3A30]"}`}>
-                                    {p.label} <span className="text-[#A1A8A3] font-normal">· fee {p.fee_pct}%</span>
-                                  </p>
-                                  <p className="text-[11px] text-[#6B756D] mt-0.5">
-                                    Bersih: <span className="font-bold text-[#2D3A30]">{formatIDR(p.net_received)}</span>
-                                  </p>
-                                  <p className="text-[11px] text-[#6B756D]">
-                                    Profit: {formatIDR(p.profit_per_unit)} · Margin: {(p.margin_pct ?? 0).toFixed(1)}%
-                                  </p>
-                                </div>
+                        {preview.platform_prices.map((p) => (
+                          <div key={p.key} className={`rounded-md p-2.5 border ${PLATFORM_BG[p.key] || "bg-white border-[#E5E2DC]"}`} data-testid={`platform-price-${p.key}`}>
+                            <div className="flex justify-between items-start">
+                              <div>
+                                <p className={`text-xs font-bold ${PLATFORM_COLOR[p.key]}`}>{p.label} <span className="text-[#A1A8A3] font-normal">fee {p.fee_pct}%</span></p>
+                                <p className="text-[11px] text-[#6B756D]">Bersih: <span className="font-bold text-[#2D3A30]">{formatIDR(p.net_received)}</span></p>
+                                <p className="text-[11px] text-[#6B756D]">Profit: {formatIDR(p.profit_per_unit)} · {(p.margin_pct ?? 0).toFixed(1)}%</p>
+                              </div>
+                              <div className="text-right">
+                                <p className="text-xs text-[#6B756D]">Harga jual</p>
                                 <p className="text-base font-extrabold text-[#2D3A30]">{formatIDR(p.price)}</p>
                               </div>
                             </div>
-                          ))}
-                        </div>
-                        <p className="text-[10px] text-[#A1A8A3] mt-2">Net tiap platform ≈ harga offline. Fee diatur di Pengaturan.</p>
+                          </div>
+                        ))}
                       </div>
                     )}
                   </>

@@ -95,15 +95,19 @@ class Menu(BaseModel):
     image_url: Optional[str] = None
     ingredients: List[RecipeIngredient] = []
     packaging: List[RecipePackaging] = []
-    labor_cost: float = 0  # per unit
-    overhead_cost: float = 0  # per unit (gas, listrik, dll)
-    margin_target_pct: float = 60       # legacy / platform margin fallback
-    offline_margin_pct: float = 40      # margin khusus channel offline/cash/dine-in
-    platform_fee_pct: float = 20        # legacy, per-platform fee now from settings
+    labor_cost: float = 0
+    overhead_cost: float = 0
+    offline_margin_pct: float = 40      # margin channel offline/cash/dine-in
+    offline_price: float = 0            # harga jual offline (0 = pakai rekomendasi)
+    shopeefood_net_target: float = 0    # target bersih dari ShopeeFood (0 = pakai offline_price)
+    gofood_net_target: float = 0        # target bersih dari GoFood
+    grabfood_net_target: float = 0      # target bersih dari GrabFood
+    # legacy fields kept for backward compat
+    margin_target_pct: float = 60
+    platform_fee_pct: float = 20
     selling_price: float = 0
     use_recommended_price: bool = True
-    offline_price: float = 0
-    yield_per_batch: float = 1  # 1 batch resep menghasilkan brp porsi
+    yield_per_batch: float = 1
     active: bool = True
     created_at: str = Field(default_factory=now_iso)
     updated_at: str = Field(default_factory=now_iso)
@@ -117,12 +121,15 @@ class MenuCreate(BaseModel):
     packaging: List[RecipePackaging] = []
     labor_cost: float = 0
     overhead_cost: float = 0
-    margin_target_pct: float = 60
     offline_margin_pct: float = 40
+    offline_price: float = 0
+    shopeefood_net_target: float = 0
+    gofood_net_target: float = 0
+    grabfood_net_target: float = 0
+    margin_target_pct: float = 60
     platform_fee_pct: float = 20
     selling_price: float = 0
     use_recommended_price: bool = True
-    offline_price: float = 0
     yield_per_batch: float = 1
     active: bool = True
 
@@ -281,12 +288,11 @@ async def compute_hpp(menu: dict) -> dict:
         ]))
         psych_prices = [c for c in candidates if c >= recommended_price - 200][:3]
 
-    # Platform pricing: tiap platform punya harga terpisah
-    # Net yang diterima penjual = offline_price (seller dapat sama berapapun channelnya)
+    # Platform pricing: tiap platform punya target net sendiri
     settings_doc = await db.settings.find_one({"id": "default"}, {"_id": 0})
-    base_price = float(menu.get("offline_price", 0) or 0)
-    if base_price <= 0:
-        base_price = selling  # fallback ke offline selling price
+    offline_sell = float(menu.get("offline_price", 0) or 0)
+    if offline_sell <= 0:
+        offline_sell = selling  # fallback ke recommended offline price
 
     platforms_cfg = [
         ("shopeefood", "ShopeeFood", float((settings_doc or {}).get("shopeefood_fee_pct", 20))),
@@ -296,21 +302,29 @@ async def compute_hpp(menu: dict) -> dict:
     platform_prices = []
     for key, label, f_pct in platforms_cfg:
         f = f_pct / 100.0
-        # Harga platform dihitung agar net = base_price (harga offline)
-        if f >= 1:
-            platform_price = base_price * 2
+        net_target = float(menu.get(f"{key}_net_target", 0) or 0)
+        if net_target > 0:
+            # User set target net sendiri untuk platform ini
+            net = net_target
         else:
-            platform_price = base_price / (1 - f)
+            # Default: net = harga offline (agar setara)
+            net = offline_sell
+        # Hitung harga jual di platform agar dapat net tersebut
+        if f >= 1:
+            platform_price = net * 2
+        else:
+            platform_price = net / (1 - f)
         platform_price = int((platform_price + 499) // 500 * 500) if platform_price > 0 else 0
-        net = platform_price * (1 - f)
-        profit = net - hpp
-        margin_pct = (profit / net * 100) if net > 0 else 0
+        actual_net = platform_price * (1 - f)
+        profit = actual_net - hpp
+        margin_pct = (profit / actual_net * 100) if actual_net > 0 else 0
         platform_prices.append({
             "key": key,
             "label": label,
             "fee_pct": f_pct,
             "price": platform_price,
-            "net_received": net,
+            "net_received": actual_net,
+            "net_target": net_target,
             "profit_per_unit": profit,
             "margin_pct": margin_pct,
         })
