@@ -97,8 +97,9 @@ class Menu(BaseModel):
     packaging: List[RecipePackaging] = []
     labor_cost: float = 0  # per unit
     overhead_cost: float = 0  # per unit (gas, listrik, dll)
-    margin_target_pct: float = 60
-    platform_fee_pct: float = 20
+    margin_target_pct: float = 60       # legacy / platform margin fallback
+    offline_margin_pct: float = 40      # margin khusus channel offline/cash/dine-in
+    platform_fee_pct: float = 20        # legacy, per-platform fee now from settings
     selling_price: float = 0
     use_recommended_price: bool = True
     offline_price: float = 0
@@ -117,6 +118,7 @@ class MenuCreate(BaseModel):
     labor_cost: float = 0
     overhead_cost: float = 0
     margin_target_pct: float = 60
+    offline_margin_pct: float = 40
     platform_fee_pct: float = 20
     selling_price: float = 0
     use_recommended_price: bool = True
@@ -252,25 +254,20 @@ async def compute_hpp(menu: dict) -> dict:
     # Bahan dibagi yield (batch cooking), packaging tetap per porsi
     hpp = (ingredients_cost / yield_n) + packaging_cost + (labor / yield_n) + (overhead / yield_n)
 
-    margin = float(menu.get("margin_target_pct", 60) or 0) / 100.0
-    fee = float(menu.get("platform_fee_pct", 0) or 0) / 100.0
+    offline_margin = float(menu.get("offline_margin_pct", menu.get("margin_target_pct", 40) or 40)) / 100.0
 
-    # Recommended OFFLINE price (tanpa fee platform) — base untuk semua channel
-    # margin% adalah profit margin dari harga jual: profit = price * margin → price = hpp / (1 - margin)
-    if margin >= 1:
+    # Offline recommended price pakai offline_margin_pct
+    if offline_margin >= 1:
         recommended_price = hpp * 2
     else:
-        recommended_price = hpp / (1 - margin) if (1 - margin) > 0 else hpp * 2
-    # round up to nearest 500
+        recommended_price = hpp / (1 - offline_margin) if (1 - offline_margin) > 0 else hpp * 2
     recommended_price = int((recommended_price + 499) // 500 * 500) if recommended_price > 0 else 0
 
     use_rec = menu.get("use_recommended_price", True)
     selling = recommended_price if use_rec else float(menu.get("selling_price", 0) or 0)
 
-    # net_per_unit di field ini = harga setelah fee platform (untuk menu.platform_fee_pct lama)
-    net_per_unit = selling * (1 - fee)
-    profit_per_unit = selling - hpp  # offline: profit langsung = harga - hpp
-    profit_margin_pct = (profit_per_unit / selling * 100) if selling > 0 else 0
+    offline_profit_per_unit = selling - hpp
+    offline_margin_pct_actual = (offline_profit_per_unit / selling * 100) if selling > 0 else 0
 
     # Psychological price suggestions (3 options)
     psych_prices = []
@@ -282,14 +279,15 @@ async def compute_hpp(menu: dict) -> dict:
             ((base // 1000 + 1) * 1000) - 100,
             ((base // 1000 + 1) * 1000) + 500,
         ]))
-        # Pick 3 closest >= recommended_price - 200
         psych_prices = [c for c in candidates if c >= recommended_price - 200][:3]
 
-    # Multi-platform pricing based on offline_price (or recommended_price as fallback)
+    # Platform pricing: tiap platform punya harga terpisah
+    # Net yang diterima penjual = offline_price (seller dapat sama berapapun channelnya)
     settings_doc = await db.settings.find_one({"id": "default"}, {"_id": 0})
     base_price = float(menu.get("offline_price", 0) or 0)
     if base_price <= 0:
-        base_price = recommended_price
+        base_price = selling  # fallback ke offline selling price
+
     platforms_cfg = [
         ("shopeefood", "ShopeeFood", float((settings_doc or {}).get("shopeefood_fee_pct", 20))),
         ("gofood", "GoFood", float((settings_doc or {}).get("gofood_fee_pct", 22))),
@@ -298,6 +296,7 @@ async def compute_hpp(menu: dict) -> dict:
     platform_prices = []
     for key, label, f_pct in platforms_cfg:
         f = f_pct / 100.0
+        # Harga platform dihitung agar net = base_price (harga offline)
         if f >= 1:
             platform_price = base_price * 2
         else:
@@ -326,9 +325,8 @@ async def compute_hpp(menu: dict) -> dict:
         "recommended_price": recommended_price,
         "psychological_prices": psych_prices,
         "selling_price": selling,
-        "net_per_unit": net_per_unit,
-        "profit_per_unit": profit_per_unit,
-        "profit_margin_pct": profit_margin_pct,
+        "profit_per_unit": offline_profit_per_unit,
+        "profit_margin_pct": offline_margin_pct_actual,
         "offline_price": base_price,
         "platform_prices": platform_prices,
         "breakdown_ingredients": breakdown_ing,
