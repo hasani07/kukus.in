@@ -32,9 +32,9 @@ const emptyMenu = {
   labor_cost: 0, overhead_cost: 0,
   offline_margin_pct: 40,
   offline_price: 0,
-  shopeefood_net_target: 0,
-  gofood_net_target: 0,
-  grabfood_net_target: 0,
+  shopeefood_margin_pct: 0,
+  gofood_margin_pct: 0,
+  grabfood_margin_pct: 0,
   margin_target_pct: 60,
   platform_fee_pct: 20,
   selling_price: 0,
@@ -70,9 +70,9 @@ export default function Menus() {
           overhead_cost: Number(form.overhead_cost) || 0,
           offline_margin_pct: Number(form.offline_margin_pct) || 0,
           offline_price: Number(form.offline_price) || 0,
-          shopeefood_net_target: Number(form.shopeefood_net_target) || 0,
-          gofood_net_target: Number(form.gofood_net_target) || 0,
-          grabfood_net_target: Number(form.grabfood_net_target) || 0,
+          shopeefood_margin_pct: Number(form.shopeefood_margin_pct) || 0,
+          gofood_margin_pct: Number(form.gofood_margin_pct) || 0,
+          grabfood_margin_pct: Number(form.grabfood_margin_pct) || 0,
           margin_target_pct: Number(form.margin_target_pct) || 0,
           platform_fee_pct: Number(form.platform_fee_pct) || 0,
           selling_price: Number(form.selling_price) || 0,
@@ -98,9 +98,9 @@ export default function Menus() {
     setForm({
       ...emptyMenu, ...m,
       offline_margin_pct: m.offline_margin_pct ?? m.margin_target_pct ?? 40,
-      shopeefood_net_target: m.shopeefood_net_target ?? 0,
-      gofood_net_target: m.gofood_net_target ?? 0,
-      grabfood_net_target: m.grabfood_net_target ?? 0,
+      shopeefood_margin_pct: m.shopeefood_margin_pct ?? 0,
+      gofood_margin_pct: m.gofood_margin_pct ?? 0,
+      grabfood_margin_pct: m.grabfood_margin_pct ?? 0,
     });
     setEditingId(m.id);
     setOpen(true);
@@ -114,9 +114,9 @@ export default function Menus() {
       overhead_cost: Number(form.overhead_cost) || 0,
       offline_margin_pct: Number(form.offline_margin_pct) || 0,
       offline_price: Number(form.offline_price) || 0,
-      shopeefood_net_target: Number(form.shopeefood_net_target) || 0,
-      gofood_net_target: Number(form.gofood_net_target) || 0,
-      grabfood_net_target: Number(form.grabfood_net_target) || 0,
+      shopeefood_margin_pct: Number(form.shopeefood_margin_pct) || 0,
+      gofood_margin_pct: Number(form.gofood_margin_pct) || 0,
+      grabfood_margin_pct: Number(form.grabfood_margin_pct) || 0,
       margin_target_pct: Number(form.margin_target_pct) || 0,
       platform_fee_pct: Number(form.platform_fee_pct) || 0,
       selling_price: Number(form.selling_price) || 0,
@@ -211,7 +211,10 @@ export default function Menus() {
                       <div className="space-y-1">
                         {m.computed.platform_prices.map((p) => (
                           <div key={p.key} className="flex items-center justify-between text-xs">
-                            <span className={`font-semibold ${PLATFORM_COLOR[p.key] || "text-[#2D3A30]"}`}>{p.label}</span>
+                            <div>
+                              <span className={`font-semibold ${PLATFORM_COLOR[p.key] || "text-[#2D3A30]"}`}>{p.label}</span>
+                              <span className="text-[#A1A8A3] ml-1">{(p.effective_margin_pct ?? 0).toFixed(0)}%</span>
+                            </div>
                             <div className="text-right">
                               <span className="font-bold text-[#2D3A30]">{formatIDR(p.price)}</span>
                               <span className="text-[#6B756D] ml-1.5">bersih {formatIDR(p.net_received)}</span>
@@ -349,14 +352,16 @@ export default function Menus() {
               <div className="pt-3 border-t border-[#E5E2DC] space-y-3">
                 <div className="flex items-center gap-2">
                   <Smartphone size={15} className="text-[#6B756D]" />
-                  <Label className="text-base font-semibold text-[#6B756D]">Target Bersih per Platform</Label>
+                  <Label className="text-base font-semibold text-[#6B756D]">Margin per Platform (%)</Label>
                 </div>
-                <p className="text-xs text-[#6B756D] -mt-1">Isi berapa yang ingin kamu terima (setelah dipotong fee platform). Sistem hitung harga jualnya otomatis. Kosongkan = sama dengan harga offline.</p>
+                <p className="text-xs text-[#6B756D] -mt-1">
+                  Isi margin yang kamu mau di atas HPP per platform. Bersih = HPP × (1 + margin%). Kosongkan = pakai margin offline.
+                </p>
 
                 {[
-                  { key: "shopeefood", label: "ShopeeFood", field: "shopeefood_net_target" },
-                  { key: "gofood", label: "GoFood", field: "gofood_net_target" },
-                  { key: "grabfood", label: "GrabFood", field: "grabfood_net_target" },
+                  { key: "shopeefood", label: "ShopeeFood", field: "shopeefood_margin_pct" },
+                  { key: "gofood", label: "GoFood", field: "gofood_margin_pct" },
+                  { key: "grabfood", label: "GrabFood", field: "grabfood_margin_pct" },
                 ].map(({ key, label, field }) => {
                   const pData = preview?.platform_prices?.find((p) => p.key === key);
                   return (
@@ -367,20 +372,21 @@ export default function Menus() {
                       </div>
                       <div className="flex items-center gap-2">
                         <div className="flex-1">
-                          <Label className="text-xs text-[#6B756D]">Mau dapat bersih (Rp)</Label>
+                          <Label className="text-xs text-[#6B756D]">Margin di atas HPP (%)</Label>
                           <Input
                             type="number"
                             value={form[field] || ""}
                             onChange={(e) => setForm({ ...form, [field]: e.target.value })}
-                            placeholder="kosong = sama dgn offline"
+                            placeholder={`kosong = pakai margin offline (${form.offline_margin_pct || 0}%)`}
                             data-testid={`menu-${field}-input`}
                           />
                         </div>
                         {pData && (
-                          <div className="text-right min-w-[110px]">
+                          <div className="text-right min-w-[120px]">
                             <p className="text-xs text-[#6B756D]">Harga jual</p>
                             <p className="text-lg font-extrabold text-[#2D3A30]">{formatIDR(pData.price)}</p>
                             <p className="text-xs text-[#6B756D]">bersih {formatIDR(pData.net_received)}</p>
+                            <p className="text-xs font-semibold text-[#4A6750]">profit {formatIDR(pData.profit_per_unit)}</p>
                           </div>
                         )}
                       </div>
@@ -448,9 +454,15 @@ export default function Menus() {
                           <div key={p.key} className={`rounded-md p-2.5 border ${PLATFORM_BG[p.key] || "bg-white border-[#E5E2DC]"}`} data-testid={`platform-price-${p.key}`}>
                             <div className="flex justify-between items-start">
                               <div>
-                                <p className={`text-xs font-bold ${PLATFORM_COLOR[p.key]}`}>{p.label} <span className="text-[#A1A8A3] font-normal">fee {p.fee_pct}%</span></p>
+                                <p className={`text-xs font-bold ${PLATFORM_COLOR[p.key]}`}>
+                                  {p.label} <span className="text-[#A1A8A3] font-normal">fee {p.fee_pct}%</span>
+                                </p>
+                                <p className="text-[11px] text-[#6B756D]">
+                                  Margin: <span className="font-bold text-[#2D3A30]">{(p.effective_margin_pct ?? 0).toFixed(0)}%</span>
+                                  {p.platform_margin_pct > 0 ? "" : " (dari offline)"}
+                                </p>
                                 <p className="text-[11px] text-[#6B756D]">Bersih: <span className="font-bold text-[#2D3A30]">{formatIDR(p.net_received)}</span></p>
-                                <p className="text-[11px] text-[#6B756D]">Profit: {formatIDR(p.profit_per_unit)} · {(p.margin_pct ?? 0).toFixed(1)}%</p>
+                                <p className="text-[11px] text-[#6B756D]">Profit: {formatIDR(p.profit_per_unit)}</p>
                               </div>
                               <div className="text-right">
                                 <p className="text-xs text-[#6B756D]">Harga jual</p>

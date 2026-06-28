@@ -5,17 +5,20 @@ export const API = `${BACKEND_URL}/api`;
 
 export const api = axios.create({ baseURL: API });
 
-// --- Simple TTL cache (60s) untuk semua GET request ---
+// --- Cache dengan TTL 60s + in-flight deduplication ---
 const CACHE_TTL = 60_000;
 const _cache = new Map();
+const _inflight = new Map(); // cegah duplicate request untuk key yang sama
 
 function cacheGet(key, fetcher) {
   const hit = _cache.get(key);
   if (hit && Date.now() - hit.ts < CACHE_TTL) return Promise.resolve(hit.data);
-  return fetcher().then((data) => {
-    _cache.set(key, { data, ts: Date.now() });
-    return data;
-  });
+  if (_inflight.has(key)) return _inflight.get(key); // warmup & page share 1 request
+  const promise = fetcher()
+    .then((data) => { _cache.set(key, { data, ts: Date.now() }); _inflight.delete(key); return data; })
+    .catch((err) => { _inflight.delete(key); throw err; });
+  _inflight.set(key, promise);
+  return promise;
 }
 
 function bust(...keys) {

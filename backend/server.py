@@ -2,6 +2,7 @@ from fastapi import FastAPI, APIRouter, HTTPException
 from dotenv import load_dotenv
 from starlette.middleware.cors import CORSMiddleware
 from motor.motor_asyncio import AsyncIOMotorClient
+import asyncio
 import os
 import logging
 from pathlib import Path
@@ -97,11 +98,11 @@ class Menu(BaseModel):
     packaging: List[RecipePackaging] = []
     labor_cost: float = 0
     overhead_cost: float = 0
-    offline_margin_pct: float = 40      # margin channel offline/cash/dine-in
-    offline_price: float = 0            # harga jual offline (0 = pakai rekomendasi)
-    shopeefood_net_target: float = 0    # target bersih dari ShopeeFood (0 = pakai offline_price)
-    gofood_net_target: float = 0        # target bersih dari GoFood
-    grabfood_net_target: float = 0      # target bersih dari GrabFood
+    offline_margin_pct: float = 40      # margin offline: HPP / (1 - margin_pct)
+    offline_price: float = 0            # override harga offline (0 = pakai rekomendasi)
+    shopeefood_margin_pct: float = 0    # margin platform: net = HPP*(1+pct/100), 0=pakai offline_margin
+    gofood_margin_pct: float = 0
+    grabfood_margin_pct: float = 0
     # legacy fields kept for backward compat
     margin_target_pct: float = 60
     platform_fee_pct: float = 20
@@ -123,9 +124,9 @@ class MenuCreate(BaseModel):
     overhead_cost: float = 0
     offline_margin_pct: float = 40
     offline_price: float = 0
-    shopeefood_net_target: float = 0
-    gofood_net_target: float = 0
-    grabfood_net_target: float = 0
+    shopeefood_margin_pct: float = 0
+    gofood_margin_pct: float = 0
+    grabfood_margin_pct: float = 0
     margin_target_pct: float = 60
     platform_fee_pct: float = 20
     selling_price: float = 0
@@ -222,12 +223,12 @@ class Settings(BaseModel):
 
 
 # ============== HPP Helper ==============
-async def compute_hpp(menu: dict) -> dict:
-    """Compute HPP, recommended price, profit estimation for a menu."""
+def _compute_hpp_pure(menu: dict, ing_map: dict, pack_map: dict, settings_doc: dict) -> dict:
+    """Pure HPP computation — no I/O. Semua data sudah di-prefetch."""
     ingredients_cost = 0.0
     breakdown_ing = []
     for ri in menu.get("ingredients", []):
-        ing = await db.ingredients.find_one({"id": ri["ingredient_id"]}, {"_id": 0})
+        ing = ing_map.get(ri["ingredient_id"])
         if ing:
             cost = ing["price_per_unit"] * ri["qty"]
             ingredients_cost += cost
@@ -243,7 +244,7 @@ async def compute_hpp(menu: dict) -> dict:
     packaging_cost = 0.0
     breakdown_pack = []
     for rp in menu.get("packaging", []):
-        pk = await db.packaging.find_one({"id": rp["packaging_id"]}, {"_id": 0})
+        pk = pack_map.get(rp["packaging_id"])
         if pk:
             cost = pk["price_per_unit"] * rp["qty"]
             packaging_cost += cost
@@ -258,12 +259,9 @@ async def compute_hpp(menu: dict) -> dict:
     labor = float(menu.get("labor_cost", 0) or 0)
     overhead = float(menu.get("overhead_cost", 0) or 0)
     yield_n = max(float(menu.get("yield_per_batch", 1) or 1), 1)
-    # Bahan dibagi yield (batch cooking), packaging tetap per porsi
     hpp = (ingredients_cost / yield_n) + packaging_cost + (labor / yield_n) + (overhead / yield_n)
 
     offline_margin = float(menu.get("offline_margin_pct", menu.get("margin_target_pct", 40) or 40)) / 100.0
-
-    # Offline recommended price pakai offline_margin_pct
     if offline_margin >= 1:
         recommended_price = hpp * 2
     else:
@@ -276,7 +274,6 @@ async def compute_hpp(menu: dict) -> dict:
     offline_profit_per_unit = selling - hpp
     offline_margin_pct_actual = (offline_profit_per_unit / selling * 100) if selling > 0 else 0
 
-    # Psychological price suggestions (3 options)
     psych_prices = []
     if recommended_price > 0:
         base = int(recommended_price)
@@ -288,45 +285,36 @@ async def compute_hpp(menu: dict) -> dict:
         ]))
         psych_prices = [c for c in candidates if c >= recommended_price - 200][:3]
 
-    # Platform pricing: tiap platform punya target net sendiri
-    settings_doc = await db.settings.find_one({"id": "default"}, {"_id": 0})
-    offline_sell = float(menu.get("offline_price", 0) or 0)
-    if offline_sell <= 0:
-        offline_sell = selling  # fallback ke recommended offline price
+    s = settings_doc or {}
+    offline_margin_pct_val = float(menu.get("offline_margin_pct", menu.get("margin_target_pct", 40) or 40))
 
     platforms_cfg = [
-        ("shopeefood", "ShopeeFood", float((settings_doc or {}).get("shopeefood_fee_pct", 20))),
-        ("gofood", "GoFood", float((settings_doc or {}).get("gofood_fee_pct", 22))),
-        ("grabfood", "GrabFood", float((settings_doc or {}).get("grabfood_fee_pct", 22))),
+        ("shopeefood", "ShopeeFood", float(s.get("shopeefood_fee_pct", 20))),
+        ("gofood", "GoFood", float(s.get("gofood_fee_pct", 22))),
+        ("grabfood", "GrabFood", float(s.get("grabfood_fee_pct", 22))),
     ]
     platform_prices = []
     for key, label, f_pct in platforms_cfg:
         f = f_pct / 100.0
-        net_target = float(menu.get(f"{key}_net_target", 0) or 0)
-        if net_target > 0:
-            # User set target net sendiri untuk platform ini
-            net = net_target
-        else:
-            # Default: net = harga offline (agar setara)
-            net = offline_sell
-        # Hitung harga jual di platform agar dapat net tersebut
+        platform_margin = float(menu.get(f"{key}_margin_pct", 0) or 0)
+        # Jika kosong, pakai margin offline sebagai fallback
+        effective_margin = platform_margin if platform_margin > 0 else offline_margin_pct_val
+        # Net bersih = HPP × (1 + margin/100)
+        net_bersih = hpp * (1 + effective_margin / 100.0)
+        # Harga jual di platform agar dapat net tersebut setelah dipotong fee
         if f >= 1:
-            platform_price = net * 2
+            platform_price = net_bersih * 2
         else:
-            platform_price = net / (1 - f)
+            platform_price = net_bersih / (1 - f)
         platform_price = int((platform_price + 499) // 500 * 500) if platform_price > 0 else 0
         actual_net = platform_price * (1 - f)
         profit = actual_net - hpp
-        margin_pct = (profit / actual_net * 100) if actual_net > 0 else 0
+        actual_margin_pct = (profit / hpp * 100) if hpp > 0 else 0
         platform_prices.append({
-            "key": key,
-            "label": label,
-            "fee_pct": f_pct,
-            "price": platform_price,
-            "net_received": actual_net,
-            "net_target": net_target,
-            "profit_per_unit": profit,
-            "margin_pct": margin_pct,
+            "key": key, "label": label, "fee_pct": f_pct,
+            "price": platform_price, "net_received": actual_net,
+            "platform_margin_pct": platform_margin, "effective_margin_pct": effective_margin,
+            "profit_per_unit": profit, "margin_pct": actual_margin_pct,
         })
 
     return {
@@ -346,6 +334,19 @@ async def compute_hpp(menu: dict) -> dict:
         "breakdown_ingredients": breakdown_ing,
         "breakdown_packaging": breakdown_pack,
     }
+
+
+async def compute_hpp(menu: dict) -> dict:
+    """Fetch data yang dibutuhkan lalu compute. Untuk operasi single-menu."""
+    ing_ids = [ri["ingredient_id"] for ri in menu.get("ingredients", [])]
+    pack_ids = [rp["packaging_id"] for rp in menu.get("packaging", [])]
+    # Batch query by ID list, jauh lebih cepat dari N kali find_one
+    ings = await db.ingredients.find({"id": {"$in": ing_ids}}, {"_id": 0}).to_list(200) if ing_ids else []
+    packs = await db.packaging.find({"id": {"$in": pack_ids}}, {"_id": 0}).to_list(200) if pack_ids else []
+    settings_doc = await db.settings.find_one({"id": "default"}, {"_id": 0})
+    ing_map = {i["id"]: i for i in ings}
+    pack_map = {p["id"]: p for p in packs}
+    return _compute_hpp_pure(menu, ing_map, pack_map, settings_doc)
 
 
 # ============== Ingredients ==============
@@ -413,10 +414,18 @@ async def delete_packaging(pk_id: str):
 # ============== Menus ==============
 @api_router.get("/menus")
 async def list_menus():
-    docs = await db.menus.find({}, {"_id": 0}).sort("name", 1).to_list(1000)
+    # Prefetch semua data sekaligus (4 query paralel) — eliminasi N+1 problem
+    docs, all_ings, all_packs, settings_doc = await asyncio.gather(
+        db.menus.find({}, {"_id": 0}).sort("name", 1).to_list(1000),
+        db.ingredients.find({}, {"_id": 0}).to_list(1000),
+        db.packaging.find({}, {"_id": 0}).to_list(1000),
+        db.settings.find_one({"id": "default"}, {"_id": 0}),
+    )
+    ing_map = {i["id"]: i for i in all_ings}
+    pack_map = {p["id"]: p for p in all_packs}
     enriched = []
     for d in docs:
-        hpp = await compute_hpp(d)
+        hpp = _compute_hpp_pure(d, ing_map, pack_map, settings_doc)
         enriched.append({**d, "computed": hpp})
     return enriched
 
