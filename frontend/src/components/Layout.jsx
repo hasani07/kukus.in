@@ -1,4 +1,4 @@
-import { NavLink, Outlet, useLocation } from "react-router-dom";
+import { NavLink, Outlet, useLocation, useNavigate } from "react-router-dom";
 import {
   LayoutDashboard,
   Carrot,
@@ -13,8 +13,10 @@ import {
   ShoppingCart,
   Users,
   LineChart,
+  LogOut,
 } from "lucide-react";
 import { useState } from "react";
+import { logout } from "@/lib/auth";
 
 const navItems = [
   { to: "/dashboard", label: "Dashboard", icon: LayoutDashboard, testId: "nav-dashboard" },
@@ -33,6 +35,12 @@ const navItems = [
 export default function Layout() {
   const [open, setOpen] = useState(false);
   const location = useLocation();
+  const navigate = useNavigate();
+
+  const handleLogout = () => {
+    logout();
+    navigate("/login", { replace: true });
+  };
 
   return (
     <div className="min-h-screen flex bg-[#FDFBF7]">
@@ -79,12 +87,19 @@ export default function Layout() {
           })}
         </nav>
 
-        <div className="p-4 border-t border-[#E5E2DC]">
+        <div className="p-4 border-t border-[#E5E2DC] space-y-3">
           <div className="bg-white rounded-md p-3 border border-[#E5E2DC]">
             <p className="text-xs text-[#6B756D] leading-relaxed">
               <span className="font-semibold text-[#2D3A30]">Tips:</span> Atur fee ShopeeFood (~20%) & target margin di Pengaturan biar harga jual otomatis pas.
             </p>
           </div>
+          <button
+            onClick={handleLogout}
+            className="flex items-center gap-2 w-full px-3 py-2 text-sm text-[#6B756D] hover:text-[#D17B60] hover:bg-[#FAEDE9] rounded-md transition-colors"
+          >
+            <LogOut size={16} />
+            Keluar
+          </button>
         </div>
       </aside>
 

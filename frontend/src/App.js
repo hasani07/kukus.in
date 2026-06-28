@@ -14,14 +14,21 @@ import OperatingCosts from "@/pages/OperatingCosts";
 import Purchases from "@/pages/Purchases";
 import Customers from "@/pages/Customers";
 import Reports from "@/pages/Reports";
+import LoginPage from "@/pages/LoginPage";
+import { isAuthenticated } from "@/lib/auth";
+
+function RequireAuth({ children }) {
+  return isAuthenticated() ? children : <Navigate to="/login" replace />;
+}
 
 function App() {
   return (
     <div className="App">
       <BrowserRouter>
         <Routes>
+          <Route path="/login" element={<LoginPage />} />
           <Route path="/invoice/:id/print" element={<InvoicePrint />} />
-          <Route element={<Layout />}>
+          <Route element={<RequireAuth><Layout /></RequireAuth>}>
             <Route index element={<Dashboard />} />
             <Route path="/dashboard" element={<Dashboard />} />
             <Route path="/bahan-baku" element={<Ingredients />} />
