@@ -23,8 +23,18 @@ ShopeeFood merchant "Kukus.In" (healthy steamed food). Full financial management
 - ✅ Laporan & Analisis: P&L Bulanan REAL (revenue - cogs - opcosts = net profit), Break-Even Calculator, Promo ROI Calculator
 - ✅ WhatsApp order form generator (bypass fee 20%)
 
+## Changelog — 2026-06-29
+- ✅ Fix: invoice number collision → atomic counter di collection `counters`
+- ✅ Fix: platform fee di sales pakai channel fee dari Settings (bukan legacy `platform_fee_pct` di menu)
+- ✅ Fix: create_sale batch-fetch (N+1 → 4 query paralel)
+- ✅ Fix: delete_purchase recalculate MAC dari sisa pembelian
+- ✅ Add: PUT /operating-costs/{cid} endpoint
+- ✅ Add: Edit biaya operasional di UI (Pencil button)
+- ✅ Add: Expiry date field di form bahan baku + kolom tabel + badge alert
+- ✅ Add: CSV export P&L di halaman Laporan
+- ✅ Fix: warmup di App.js tidak lagi load fetchMenus (berat karena compute HPP semua menu)
+
 ## Backlog
-- P1: Expiry tracking UI for ingredients (backend supports expiry_date)
-- P1: CSV/Excel export, monthly recap PDF
+- P1: CSV/Excel export Bahan Baku & Pembelian
 - P2: Shopping list auto-generate dari forecast
 - P2: Multi-outlet, sales forecast AI

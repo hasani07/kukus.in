@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { fetchInvoices, createInvoice, updateInvoiceStatus, deleteInvoice } from "@/lib/api";
+import { fetchInvoices, createInvoice, updateInvoice, updateInvoiceStatus, deleteInvoice } from "@/lib/api";
 import { formatIDR, formatDate, todayISO } from "@/lib/format";
 import PageHeader from "@/components/PageHeader";
 import EmptyState from "@/components/EmptyState";
@@ -11,7 +11,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
-import { Plus, Trash2, FileText, X, Printer } from "lucide-react";
+import { Plus, Pencil, Trash2, FileText, X, Printer } from "lucide-react";
 import { toast } from "sonner";
 
 const statusColors = {
@@ -21,20 +21,40 @@ const statusColors = {
 };
 const statusLabel = { unpaid: "Belum Dibayar", paid: "Lunas", cancelled: "Dibatalkan" };
 
+const emptyForm = () => ({
+  date: todayISO(), due_date: "", customer_name: "", customer_phone: "", customer_address: "",
+  items: [], discount: 0, tax_pct: 0, status: "unpaid", notes: "",
+});
+
 export default function Invoices() {
   const [invoices, setInvoices] = useState([]);
   const [open, setOpen] = useState(false);
-  const [form, setForm] = useState({
-    date: todayISO(), due_date: "", customer_name: "", customer_phone: "", customer_address: "",
-    items: [], discount: 0, tax_pct: 0, status: "unpaid", notes: "",
-  });
+  const [editingId, setEditingId] = useState(null);
+  const [form, setForm] = useState(emptyForm());
 
   const load = async () => setInvoices(await fetchInvoices());
   useEffect(() => { load(); }, []);
 
   const openCreate = () => {
-    setForm({ date: todayISO(), due_date: "", customer_name: "", customer_phone: "", customer_address: "",
-      items: [], discount: 0, tax_pct: 0, status: "unpaid", notes: "" });
+    setForm(emptyForm());
+    setEditingId(null);
+    setOpen(true);
+  };
+
+  const openEdit = (inv) => {
+    setForm({
+      date: inv.date,
+      due_date: inv.due_date || "",
+      customer_name: inv.customer_name,
+      customer_phone: inv.customer_phone || "",
+      customer_address: inv.customer_address || "",
+      items: inv.items.map((it) => ({ name: it.name, qty: it.qty, price: it.price })),
+      discount: inv.discount || 0,
+      tax_pct: inv.tax_pct || 0,
+      status: inv.status,
+      notes: inv.notes || "",
+    });
+    setEditingId(inv.id);
     setOpen(true);
   };
 
@@ -47,20 +67,26 @@ export default function Invoices() {
   const save = async () => {
     if (!form.customer_name.trim()) { toast.error("Nama customer wajib"); return; }
     if (form.items.length === 0) { toast.error("Minimal 1 item"); return; }
+    const payload = {
+      date: form.date,
+      due_date: form.due_date || null,
+      customer_name: form.customer_name.trim(),
+      customer_phone: form.customer_phone || null,
+      customer_address: form.customer_address || null,
+      items: form.items.map((it) => ({ name: it.name, qty: Number(it.qty), price: Number(it.price) })),
+      discount: Number(form.discount) || 0,
+      tax_pct: Number(form.tax_pct) || 0,
+      status: form.status,
+      notes: form.notes || null,
+    };
     try {
-      const inv = await createInvoice({
-        date: form.date,
-        due_date: form.due_date || null,
-        customer_name: form.customer_name.trim(),
-        customer_phone: form.customer_phone || null,
-        customer_address: form.customer_address || null,
-        items: form.items.map((it) => ({ name: it.name, qty: Number(it.qty), price: Number(it.price) })),
-        discount: Number(form.discount) || 0,
-        tax_pct: Number(form.tax_pct) || 0,
-        status: form.status,
-        notes: form.notes || null,
-      });
-      toast.success(`Invoice ${inv.invoice_number} dibuat`);
+      if (editingId) {
+        await updateInvoice(editingId, payload);
+        toast.success("Invoice diperbarui");
+      } else {
+        const inv = await createInvoice(payload);
+        toast.success(`Invoice ${inv.invoice_number} dibuat`);
+      }
       setOpen(false); load();
     } catch (e) { toast.error("Gagal menyimpan"); }
   };
@@ -130,6 +156,9 @@ export default function Invoices() {
                         <Button size="sm" variant="outline" onClick={() => printInvoice(inv.id)} className="mr-1" data-testid={`print-invoice-${inv.id}`}>
                           <Printer size={13} className="mr-1" /> Print
                         </Button>
+                        <Button size="sm" variant="ghost" onClick={() => openEdit(inv)} data-testid={`edit-invoice-${inv.id}`}>
+                          <Pencil size={14} />
+                        </Button>
                         <Button size="sm" variant="ghost" onClick={() => remove(inv.id)} data-testid={`delete-invoice-${inv.id}`}>
                           <Trash2 size={14} className="text-[#D17B60]" />
                         </Button>
@@ -145,7 +174,7 @@ export default function Invoices() {
 
       <Dialog open={open} onOpenChange={setOpen}>
         <DialogContent className="bg-white max-w-3xl max-h-[90vh] overflow-y-auto" data-testid="invoice-dialog">
-          <DialogHeader><DialogTitle>Buat Invoice</DialogTitle></DialogHeader>
+          <DialogHeader><DialogTitle>{editingId ? "Edit Invoice" : "Buat Invoice"}</DialogTitle></DialogHeader>
           <div className="space-y-4">
             <div className="grid grid-cols-2 gap-3">
               <div><Label>Tanggal</Label><Input type="date" value={form.date} onChange={(e) => setForm({ ...form, date: e.target.value })} data-testid="invoice-date-input" /></div>
@@ -194,7 +223,7 @@ export default function Invoices() {
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setOpen(false)} data-testid="invoice-cancel-btn">Batal</Button>
-            <Button onClick={save} className="bg-[#4A6750] hover:bg-[#3B5340] text-white" data-testid="invoice-save-btn">Buat Invoice</Button>
+            <Button onClick={save} className="bg-[#4A6750] hover:bg-[#3B5340] text-white" data-testid="invoice-save-btn">{editingId ? "Simpan Perubahan" : "Buat Invoice"}</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

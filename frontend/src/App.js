@@ -17,7 +17,7 @@ import Customers from "@/pages/Customers";
 import Reports from "@/pages/Reports";
 import LoginPage from "@/pages/LoginPage";
 import { isAuthenticated } from "@/lib/auth";
-import { fetchDashboard, fetchIngredients, fetchPackaging, fetchMenus, fetchSettings } from "@/lib/api";
+import { fetchDashboard, fetchIngredients, fetchSettings } from "@/lib/api";
 
 function RequireAuth({ children }) {
   return isAuthenticated() ? children : <Navigate to="/login" replace />;
@@ -26,12 +26,11 @@ function RequireAuth({ children }) {
 function AppWarmup() {
   useEffect(() => {
     if (!isAuthenticated()) return;
-    // Warm up serverless function + prefetch data yang paling sering dipakai
+    // Warm up serverless function + prefetch data ringan yang paling sering dipakai
+    // fetchMenus dihapus dari sini — berat karena hitung HPP semua menu saat cold-start
     Promise.allSettled([
       fetchDashboard(),
       fetchIngredients(),
-      fetchPackaging(),
-      fetchMenus(),
       fetchSettings(),
     ]);
   }, []);

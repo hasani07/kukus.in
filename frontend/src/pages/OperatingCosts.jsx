@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { fetchOpCosts, createOpCost, deleteOpCost } from "@/lib/api";
+import { fetchOpCosts, createOpCost, updateOpCost, deleteOpCost } from "@/lib/api";
 import { formatIDR, formatDate, todayISO } from "@/lib/format";
 import PageHeader from "@/components/PageHeader";
 import EmptyState from "@/components/EmptyState";
@@ -10,7 +10,7 @@ import { Label } from "@/components/ui/label";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
-import { Plus, Trash2, Wallet, ChevronLeft, ChevronRight } from "lucide-react";
+import { Plus, Pencil, Trash2, Wallet, ChevronLeft, ChevronRight } from "lucide-react";
 import { toast } from "sonner";
 
 const CATEGORIES = [
@@ -36,21 +36,33 @@ function shiftMonth(ym, delta) {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
 }
 
+const emptyForm = { name: "", category: "rent", amount: 0, frequency: "monthly", date: todayISO(), notes: "" };
+
 export default function OperatingCosts() {
   const [items, setItems] = useState([]);
   const [open, setOpen] = useState(false);
+  const [editingId, setEditingId] = useState(null);
   const [month, setMonth] = useState(todayISO().slice(0, 7));
-  const [form, setForm] = useState({ name: "", category: "rent", amount: 0, frequency: "monthly", date: todayISO(), notes: "" });
+  const [form, setForm] = useState(emptyForm);
 
   const load = async () => setItems(await fetchOpCosts());
   useEffect(() => { load(); }, []);
 
+  const openCreate = () => { setForm(emptyForm); setEditingId(null); setOpen(true); };
+  const openEdit = (item) => { setForm({ name: item.name, category: item.category, amount: item.amount, frequency: item.frequency, date: item.date, notes: item.notes || "" }); setEditingId(item.id); setOpen(true); };
+
   const save = async () => {
     if (!form.name.trim()) { toast.error("Nama wajib"); return; }
-    await createOpCost({ ...form, amount: Number(form.amount) });
-    toast.success("Biaya tercatat");
+    const payload = { ...form, amount: Number(form.amount) };
+    if (editingId) {
+      await updateOpCost(editingId, payload);
+      toast.success("Biaya diperbarui");
+    } else {
+      await createOpCost(payload);
+      toast.success("Biaya tercatat");
+    }
     setOpen(false);
-    setForm({ name: "", category: "rent", amount: 0, frequency: "monthly", date: todayISO(), notes: "" });
+    setForm(emptyForm);
     load();
   };
 
@@ -67,7 +79,7 @@ export default function OperatingCosts() {
     <div className="p-6 sm:p-10 max-w-[1400px]">
       <PageHeader testId="opcosts-page" title="Biaya Operasional"
         subtitle="Catat semua biaya non-bahan (sewa, listrik, gaji, marketing). Wajib untuk laporan laba-rugi yang akurat."
-        action={<Button onClick={() => setOpen(true)} className="bg-[#4A6750] hover:bg-[#3B5340] text-white" data-testid="add-opcost-btn"><Plus size={16} className="mr-2" /> Tambah Biaya</Button>} />
+        action={<Button onClick={openCreate} className="bg-[#4A6750] hover:bg-[#3B5340] text-white" data-testid="add-opcost-btn"><Plus size={16} className="mr-2" /> Tambah Biaya</Button>} />
 
       {/* Month Picker */}
       <div className="flex items-center gap-3 mb-5">
@@ -104,7 +116,7 @@ export default function OperatingCosts() {
       {filtered.length === 0 ? (
         <EmptyState icon={Wallet} title={`Belum ada biaya di ${monthLabel(month)}`}
           description="Mulai catat sewa, listrik, gaji, dll. Tanpa data ini, profit di dashboard belum mencerminkan untung beneran."
-          action={<Button onClick={() => setOpen(true)} className="bg-[#4A6750] hover:bg-[#3B5340] text-white" data-testid="empty-add-opcost-btn">Tambah Biaya</Button>} />
+          action={<Button onClick={openCreate} className="bg-[#4A6750] hover:bg-[#3B5340] text-white" data-testid="empty-add-opcost-btn">Tambah Biaya</Button>} />
       ) : (
         <Card className="border-[#E5E2DC]"><CardContent className="p-0">
           <div className="overflow-x-auto"><table className="w-full text-sm">
@@ -123,7 +135,10 @@ export default function OperatingCosts() {
                 <td className="py-3 px-4"><Badge variant="outline">{CATEGORIES.find((c) => c.v === i.category)?.label || i.category}</Badge></td>
                 <td className="py-3 px-4 text-[#6B756D]">{i.frequency === "monthly" ? "Bulanan" : i.frequency === "daily" ? "Harian" : "Sekali"}</td>
                 <td className="py-3 px-4 text-right font-bold text-[#2D3A30]">{formatIDR(i.amount)}</td>
-                <td className="py-3 px-4 text-right"><Button size="sm" variant="ghost" onClick={async () => { await deleteOpCost(i.id); load(); }} data-testid={`delete-opcost-${i.id}`}><Trash2 size={14} className="text-[#D17B60]" /></Button></td>
+                <td className="py-3 px-4 text-right">
+                  <Button size="sm" variant="ghost" onClick={() => openEdit(i)} data-testid={`edit-opcost-${i.id}`}><Pencil size={14} /></Button>
+                  <Button size="sm" variant="ghost" onClick={async () => { if (!confirm("Hapus biaya ini?")) return; await deleteOpCost(i.id); load(); }} data-testid={`delete-opcost-${i.id}`}><Trash2 size={14} className="text-[#D17B60]" /></Button>
+                </td>
               </tr>))}</tbody>
           </table></div>
         </CardContent></Card>
@@ -131,7 +146,7 @@ export default function OperatingCosts() {
 
       <Dialog open={open} onOpenChange={setOpen}>
         <DialogContent className="bg-white" data-testid="opcost-dialog">
-          <DialogHeader><DialogTitle>Tambah Biaya Operasional</DialogTitle></DialogHeader>
+          <DialogHeader><DialogTitle>{editingId ? "Edit Biaya Operasional" : "Tambah Biaya Operasional"}</DialogTitle></DialogHeader>
           <div className="space-y-3">
             <div><Label>Nama</Label><Input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} placeholder="Sewa dapur" data-testid="opcost-name-input" /></div>
             <div className="grid grid-cols-2 gap-3">

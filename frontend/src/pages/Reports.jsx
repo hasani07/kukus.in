@@ -8,7 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { TrendingUp, Calculator, Sparkles } from "lucide-react";
+import { TrendingUp, Calculator, Sparkles, Download } from "lucide-react";
 import { toast } from "sonner";
 
 export default function Reports() {
@@ -35,6 +35,33 @@ export default function Reports() {
   );
 }
 
+function exportPnLCSV(data, month) {
+  if (!data) return;
+  const rows = [
+    ["Laporan Laba-Rugi Kukus.In", month],
+    [],
+    ["Keterangan", "Jumlah (Rp)"],
+    ["Pendapatan (Revenue)", data.revenue],
+    ["HPP / Cost of Goods Sold", data.cogs],
+    ["Laba Kotor (Gross Profit)", data.gross_profit],
+    ["Margin Kotor (%)", `${(data.gross_margin_pct ?? 0).toFixed(1)}%`],
+    [],
+    ["--- Biaya Operasional ---", ""],
+    ...data.operating_costs_by_category.map((c) => [c.category, c.amount]),
+    ["Total Biaya Operasional", data.operating_costs_total],
+    [],
+    ["Laba Bersih (Net Profit)", data.net_profit],
+    ["Net Margin (%)", `${(data.net_margin_pct ?? 0).toFixed(1)}%`],
+    ["Total Order", data.total_orders],
+  ];
+  const csv = rows.map((r) => r.map((c) => `"${String(c ?? "").replace(/"/g, '""')}"`).join(",")).join("\n");
+  const blob = new Blob(["﻿" + csv], { type: "text/csv;charset=utf-8" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url; a.download = `kukus-in-pnl-${month}.csv`; a.click();
+  URL.revokeObjectURL(url);
+}
+
 function PnLTab({ defaultMonth }) {
   const [month, setMonth] = useState(defaultMonth);
   const [data, setData] = useState(null);
@@ -52,7 +79,12 @@ function PnLTab({ defaultMonth }) {
         <Card className="border-[#E5E2DC] pnl-printable"><CardContent className="p-8">
           <div className="flex justify-between items-start mb-6 no-print">
             <h3 className="font-bold text-xl text-[#2D3A30]">Laporan Laba-Rugi {month}</h3>
-            <Button size="sm" variant="outline" onClick={() => window.print()} data-testid="print-pnl-btn">🖨️ Print / Save PDF</Button>
+            <div className="flex gap-2">
+              <Button size="sm" variant="outline" onClick={() => exportPnLCSV(data, month)} data-testid="export-pnl-btn">
+                <Download size={14} className="mr-1" /> CSV
+              </Button>
+              <Button size="sm" variant="outline" onClick={() => window.print()} data-testid="print-pnl-btn">🖨️ Print / Save PDF</Button>
+            </div>
           </div>
           <h3 className="font-bold text-xl text-[#2D3A30] mb-6 print-only">Kukus.In · Laporan Laba-Rugi {month}</h3>
           <div className="space-y-3 max-w-2xl">

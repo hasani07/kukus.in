@@ -57,6 +57,7 @@ export const deleteSale = (id) => api.delete(`/sales/${id}`).then((r) => { bust(
 export const fetchInvoices = () => cacheGet("invoices", () => api.get("/invoices").then((r) => r.data));
 export const fetchInvoice = (id) => api.get(`/invoices/${id}`).then((r) => r.data);
 export const createInvoice = (data) => api.post("/invoices", data).then((r) => { bust("invoices", "dashboard"); return r.data; });
+export const updateInvoice = (id, data) => api.put(`/invoices/${id}`, data).then((r) => { bust("invoices"); return r.data; });
 export const updateInvoiceStatus = (id, status) => api.put(`/invoices/${id}/status`, { status }).then((r) => { bust("invoices"); return r.data; });
 export const deleteInvoice = (id) => api.delete(`/invoices/${id}`).then((r) => { bust("invoices", "dashboard"); return r.data; });
 
@@ -67,12 +68,15 @@ export const updateSettings = (data) => api.put("/settings", data).then((r) => {
 // Operating Costs
 export const fetchOpCosts = () => cacheGet("operating-costs", () => api.get("/operating-costs").then((r) => r.data));
 export const createOpCost = (data) => api.post("/operating-costs", data).then((r) => { bust("operating-costs", "dashboard"); return r.data; });
+export const updateOpCost = (id, data) => api.put(`/operating-costs/${id}`, data).then((r) => { bust("operating-costs", "dashboard"); return r.data; });
 export const deleteOpCost = (id) => api.delete(`/operating-costs/${id}`).then((r) => { bust("operating-costs", "dashboard"); return r.data; });
 
 // Purchases
 export const fetchPurchases = () => cacheGet("purchases", () => api.get("/purchases").then((r) => r.data));
-export const createPurchase = (data) => api.post("/purchases", data).then((r) => { bust("purchases", "shopping-list", "ingredients"); return r.data; });
-export const deletePurchase = (id) => api.delete(`/purchases/${id}`).then((r) => { bust("purchases", "shopping-list", "ingredients"); return r.data; });
+export const createPurchase = (data) => api.post("/purchases", data).then((r) => { bust("purchases", "shopping-list", "ingredients", "packaging"); return r.data; });
+export const deletePurchase = (id) => api.delete(`/purchases/${id}`).then((r) => { bust("purchases", "shopping-list", "ingredients", "packaging"); return r.data; });
+export const fetchIngredientPriceHistory = (id) => api.get(`/ingredients/${id}/price-history`).then((r) => r.data);
+export const fetchPackagingPriceHistory = (id) => api.get(`/packaging/${id}/price-history`).then((r) => r.data);
 
 // Customers
 export const fetchCustomers = () => cacheGet("customers", () => api.get("/customers").then((r) => r.data));

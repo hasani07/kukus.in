@@ -2,6 +2,7 @@ from fastapi import FastAPI, APIRouter, HTTPException
 from dotenv import load_dotenv
 from starlette.middleware.cors import CORSMiddleware
 from motor.motor_asyncio import AsyncIOMotorClient
+from pymongo import ReturnDocument
 import asyncio
 import os
 import logging
@@ -155,6 +156,8 @@ class Sale(BaseModel):
     total: float  # net received
     total_hpp: float = 0
     profit: float = 0
+    customer_id: Optional[str] = None
+    customer_name: Optional[str] = None  # snapshot
     notes: Optional[str] = None
     created_at: str = Field(default_factory=now_iso)
 
@@ -164,6 +167,8 @@ class SaleCreate(BaseModel):
     channel: str = "shopeefood"
     items: List[SaleItem]
     discount: float = 0
+    customer_id: Optional[str] = None
+    customer_name: Optional[str] = None
     notes: Optional[str] = None
 
 
@@ -486,23 +491,32 @@ async def list_sales(start: Optional[str] = None, end: Optional[str] = None):
 
 @api_router.post("/sales")
 async def create_sale(data: SaleCreate):
+    menu_ids = [it.menu_id for it in data.items]
+
+    # Batch-fetch semua data yang dibutuhkan sekaligus (4 query paralel)
+    menus_list, all_ings, all_packs, settings_doc = await asyncio.gather(
+        db.menus.find({"id": {"$in": menu_ids}}, {"_id": 0}).to_list(100),
+        db.ingredients.find({}, {"_id": 0}).to_list(1000),
+        db.packaging.find({}, {"_id": 0}).to_list(1000),
+        db.settings.find_one({"id": "default"}, {"_id": 0}),
+    )
+    menus_map = {m["id"]: m for m in menus_list}
+    ing_map = {i["id"]: i for i in all_ings}
+    pack_map = {p["id"]: p for p in all_packs}
+
     subtotal = 0.0
     total_hpp = 0.0
-    platform_fee_pct_acc = 0.0
-    weighted_count = 0
-
     enriched_items = []
+
     for it in data.items:
-        menu = await db.menus.find_one({"id": it.menu_id}, {"_id": 0})
+        menu = menus_map.get(it.menu_id)
         if not menu:
             raise HTTPException(status_code=400, detail=f"Menu {it.menu_id} not found")
-        computed = await compute_hpp(menu)
+        computed = _compute_hpp_pure(menu, ing_map, pack_map, settings_doc)
         line_total = it.price * it.qty
         line_hpp = computed["hpp"] * it.qty
         subtotal += line_total
         total_hpp += line_hpp
-        platform_fee_pct_acc += float(menu.get("platform_fee_pct", 0)) * line_total
-        weighted_count += line_total
         enriched_items.append(SaleItem(
             menu_id=it.menu_id,
             menu_name=menu["name"],
@@ -523,16 +537,17 @@ async def create_sale(data: SaleCreate):
                 {"$inc": {"stock": -rp["qty"] * it.qty}}
             )
 
-    # Platform fee: use channel-aware default - if channel is dine-in/other set 0
+    # Platform fee berdasarkan channel dari Settings (bukan dari field legacy menu)
     if data.channel in ("dine-in", "other", "cash"):
         platform_fee = 0
     else:
-        # weighted avg platform fee from menus, fallback to 20%
-        if weighted_count > 0:
-            avg_fee_pct = platform_fee_pct_acc / weighted_count
-        else:
-            avg_fee_pct = 20
-        platform_fee = subtotal * (avg_fee_pct / 100.0)
+        s = settings_doc or {}
+        channel_fee_pct = {
+            "shopeefood": float(s.get("shopeefood_fee_pct", 20)),
+            "gofood": float(s.get("gofood_fee_pct", 22)),
+            "grabfood": float(s.get("grabfood_fee_pct", 22)),
+        }.get(data.channel, 20)
+        platform_fee = subtotal * (channel_fee_pct / 100.0)
 
     total = subtotal - platform_fee - data.discount
     profit = total - total_hpp
@@ -547,6 +562,8 @@ async def create_sale(data: SaleCreate):
         total=total,
         total_hpp=total_hpp,
         profit=profit,
+        customer_id=data.customer_id,
+        customer_name=data.customer_name,
         notes=data.notes,
     )
     await db.sales.insert_one(sale.model_dump())
@@ -579,8 +596,13 @@ async def delete_sale(sale_id: str):
 # ============== Invoices ==============
 async def gen_invoice_number():
     today = datetime.now(timezone.utc).strftime("%Y%m")
-    count = await db.invoices.count_documents({})
-    return f"INV-{today}-{count + 1:04d}"
+    result = await db.counters.find_one_and_update(
+        {"id": f"invoice_{today}"},
+        {"$inc": {"seq": 1}},
+        upsert=True,
+        return_document=ReturnDocument.AFTER,
+    )
+    return f"INV-{today}-{result['seq']:04d}"
 
 
 @api_router.get("/invoices")
@@ -621,6 +643,33 @@ async def create_invoice(data: InvoiceCreate):
     )
     await db.invoices.insert_one(inv.model_dump())
     return inv
+
+
+@api_router.put("/invoices/{inv_id}")
+async def update_invoice(inv_id: str, data: InvoiceCreate):
+    existing = await db.invoices.find_one({"id": inv_id}, {"_id": 0})
+    if not existing:
+        raise HTTPException(status_code=404, detail="Not found")
+    subtotal = sum(i.qty * i.price for i in data.items)
+    tax_amount = (subtotal - data.discount) * (data.tax_pct / 100.0)
+    total = subtotal - data.discount + tax_amount
+    update = {
+        "date": data.date,
+        "due_date": data.due_date,
+        "customer_name": data.customer_name,
+        "customer_phone": data.customer_phone,
+        "customer_address": data.customer_address,
+        "items": [i.model_dump() for i in data.items],
+        "subtotal": subtotal,
+        "discount": data.discount,
+        "tax_pct": data.tax_pct,
+        "tax_amount": tax_amount,
+        "total": total,
+        "notes": data.notes,
+    }
+    await db.invoices.update_one({"id": inv_id}, {"$set": update})
+    doc = await db.invoices.find_one({"id": inv_id}, {"_id": 0})
+    return doc
 
 
 @api_router.put("/invoices/{inv_id}/status")
@@ -693,6 +742,16 @@ async def create_op_cost(data: OperatingCostCreate):
     return obj
 
 
+@api_router.put("/operating-costs/{cid}")
+async def update_op_cost(cid: str, data: OperatingCostCreate):
+    update = data.model_dump()
+    result = await db.operating_costs.update_one({"id": cid}, {"$set": update})
+    if result.matched_count == 0:
+        raise HTTPException(status_code=404, detail="Not found")
+    doc = await db.operating_costs.find_one({"id": cid}, {"_id": 0})
+    return doc
+
+
 @api_router.delete("/operating-costs/{cid}")
 async def delete_op_cost(cid: str):
     await db.operating_costs.delete_one({"id": cid})
@@ -703,11 +762,20 @@ async def delete_op_cost(cid: str):
 class Purchase(BaseModel):
     model_config = ConfigDict(extra="ignore")
     id: str = Field(default_factory=new_id)
-    ingredient_id: str
-    ingredient_name: str
-    qty: float
-    price_per_unit: float
-    total_cost: float
+    item_type: str = "ingredient"       # "ingredient" | "packaging"
+    ingredient_id: Optional[str] = None
+    packaging_id: Optional[str] = None
+    item_name: str = ""                 # snapshot name
+    ingredient_name: Optional[str] = None  # legacy compat
+    # Bulk purchase fields
+    purchase_qty: float = 1             # jumlah satuan beli (mis. 2 tray)
+    purchase_unit: str = ""             # nama satuan beli (mis. "tray", "karung")
+    contents_per_unit: float = 1        # isi per satuan beli (mis. 30 butir/tray)
+    price_per_purchase_unit: float = 0  # harga per satuan beli (mis. 55000/tray)
+    # Base unit values (stored, derived from bulk fields)
+    qty: float = 0                      # = purchase_qty * contents_per_unit
+    price_per_unit: float = 0           # = price_per_purchase_unit / contents_per_unit
+    total_cost: float = 0               # = purchase_qty * price_per_purchase_unit
     date: str
     supplier: Optional[str] = None
     notes: Optional[str] = None
@@ -715,9 +783,13 @@ class Purchase(BaseModel):
 
 
 class PurchaseCreate(BaseModel):
-    ingredient_id: str
-    qty: float
-    price_per_unit: float
+    item_type: str = "ingredient"       # "ingredient" | "packaging"
+    ingredient_id: Optional[str] = None
+    packaging_id: Optional[str] = None
+    purchase_qty: float                 # jumlah satuan beli
+    purchase_unit: str = ""             # nama satuan beli (kosong = langsung base unit)
+    contents_per_unit: float = 1        # isi per satuan beli
+    price_per_purchase_unit: float      # harga per satuan beli
     date: str
     supplier: Optional[str] = None
     notes: Optional[str] = None
@@ -731,32 +803,70 @@ async def list_purchases():
 
 @api_router.post("/purchases")
 async def create_purchase(data: PurchaseCreate):
-    ing = await db.ingredients.find_one({"id": data.ingredient_id}, {"_id": 0})
-    if not ing:
-        raise HTTPException(status_code=404, detail="Bahan tidak ditemukan")
-    total = data.qty * data.price_per_unit
-    # Moving average cost update
-    old_stock = float(ing.get("stock", 0))
-    old_price = float(ing.get("price_per_unit", 0))
-    new_stock = old_stock + data.qty
-    if new_stock > 0:
-        new_price = (old_stock * old_price + data.qty * data.price_per_unit) / new_stock
+    base_qty = data.purchase_qty * data.contents_per_unit
+    base_price = data.price_per_purchase_unit / data.contents_per_unit if data.contents_per_unit > 0 else data.price_per_purchase_unit
+    total_cost = data.purchase_qty * data.price_per_purchase_unit
+
+    if data.item_type == "packaging":
+        if not data.packaging_id:
+            raise HTTPException(status_code=400, detail="packaging_id wajib untuk item_type packaging")
+        pk = await db.packaging.find_one({"id": data.packaging_id}, {"_id": 0})
+        if not pk:
+            raise HTTPException(status_code=404, detail="Packaging tidak ditemukan")
+        old_stock = float(pk.get("stock", 0))
+        old_price = float(pk.get("price_per_unit", 0))
+        new_stock = old_stock + base_qty
+        new_price = (old_stock * old_price + base_qty * base_price) / new_stock if new_stock > 0 else base_price
+        await db.packaging.update_one(
+            {"id": data.packaging_id},
+            {"$set": {"stock": new_stock, "price_per_unit": new_price, "updated_at": now_iso()}}
+        )
+        purchase = Purchase(
+            item_type="packaging",
+            packaging_id=data.packaging_id,
+            item_name=pk["name"],
+            purchase_qty=data.purchase_qty,
+            purchase_unit=data.purchase_unit,
+            contents_per_unit=data.contents_per_unit,
+            price_per_purchase_unit=data.price_per_purchase_unit,
+            qty=base_qty,
+            price_per_unit=base_price,
+            total_cost=total_cost,
+            date=data.date,
+            supplier=data.supplier,
+            notes=data.notes,
+        )
     else:
-        new_price = data.price_per_unit
-    await db.ingredients.update_one(
-        {"id": data.ingredient_id},
-        {"$set": {"stock": new_stock, "price_per_unit": new_price, "updated_at": now_iso()}}
-    )
-    purchase = Purchase(
-        ingredient_id=data.ingredient_id,
-        ingredient_name=ing["name"],
-        qty=data.qty,
-        price_per_unit=data.price_per_unit,
-        total_cost=total,
-        date=data.date,
-        supplier=data.supplier,
-        notes=data.notes,
-    )
+        if not data.ingredient_id:
+            raise HTTPException(status_code=400, detail="ingredient_id wajib untuk item_type ingredient")
+        ing = await db.ingredients.find_one({"id": data.ingredient_id}, {"_id": 0})
+        if not ing:
+            raise HTTPException(status_code=404, detail="Bahan tidak ditemukan")
+        old_stock = float(ing.get("stock", 0))
+        old_price = float(ing.get("price_per_unit", 0))
+        new_stock = old_stock + base_qty
+        new_price = (old_stock * old_price + base_qty * base_price) / new_stock if new_stock > 0 else base_price
+        await db.ingredients.update_one(
+            {"id": data.ingredient_id},
+            {"$set": {"stock": new_stock, "price_per_unit": new_price, "updated_at": now_iso()}}
+        )
+        purchase = Purchase(
+            item_type="ingredient",
+            ingredient_id=data.ingredient_id,
+            item_name=ing["name"],
+            ingredient_name=ing["name"],  # legacy compat
+            purchase_qty=data.purchase_qty,
+            purchase_unit=data.purchase_unit,
+            contents_per_unit=data.contents_per_unit,
+            price_per_purchase_unit=data.price_per_purchase_unit,
+            qty=base_qty,
+            price_per_unit=base_price,
+            total_cost=total_cost,
+            date=data.date,
+            supplier=data.supplier,
+            notes=data.notes,
+        )
+
     await db.purchases.insert_one(purchase.model_dump())
     return purchase
 
@@ -766,13 +876,59 @@ async def delete_purchase(pid: str):
     pur = await db.purchases.find_one({"id": pid}, {"_id": 0})
     if not pur:
         raise HTTPException(status_code=404, detail="Not found")
-    # rollback stock (gak rollback harga karena moving avg susah dikomposisi)
-    await db.ingredients.update_one(
-        {"id": pur["ingredient_id"]},
-        {"$inc": {"stock": -pur["qty"]}}
-    )
+
+    qty_to_rollback = float(pur.get("qty", 0))
+    item_type = pur.get("item_type", "ingredient")
+
+    # Hapus dulu agar query remaining purchases tidak menyertakan ini
     await db.purchases.delete_one({"id": pid})
+
+    if item_type == "packaging" and pur.get("packaging_id"):
+        pk_id = pur["packaging_id"]
+        await db.packaging.update_one({"id": pk_id}, {"$inc": {"stock": -qty_to_rollback}})
+        # Recalculate MAC dari sisa pembelian
+        remaining = await db.purchases.find({"packaging_id": pk_id}, {"_id": 0}).to_list(1000)
+        if remaining:
+            total_qty = sum(float(p.get("qty", 0)) for p in remaining)
+            total_cost = sum(float(p.get("qty", 0)) * float(p.get("price_per_unit", 0)) for p in remaining)
+            if total_qty > 0:
+                await db.packaging.update_one(
+                    {"id": pk_id},
+                    {"$set": {"price_per_unit": total_cost / total_qty, "updated_at": now_iso()}}
+                )
+    elif pur.get("ingredient_id"):
+        ing_id = pur["ingredient_id"]
+        await db.ingredients.update_one({"id": ing_id}, {"$inc": {"stock": -qty_to_rollback}})
+        # Recalculate MAC dari sisa pembelian
+        remaining = await db.purchases.find({"ingredient_id": ing_id}, {"_id": 0}).to_list(1000)
+        if remaining:
+            total_qty = sum(float(p.get("qty", 0)) for p in remaining)
+            total_cost = sum(float(p.get("qty", 0)) * float(p.get("price_per_unit", 0)) for p in remaining)
+            if total_qty > 0:
+                await db.ingredients.update_one(
+                    {"id": ing_id},
+                    {"$set": {"price_per_unit": total_cost / total_qty, "updated_at": now_iso()}}
+                )
+
     return {"ok": True}
+
+
+@api_router.get("/ingredients/{ing_id}/price-history")
+async def ingredient_price_history(ing_id: str):
+    docs = await db.purchases.find(
+        {"ingredient_id": ing_id},
+        {"_id": 0}
+    ).sort("date", -1).to_list(200)
+    return docs
+
+
+@api_router.get("/packaging/{pk_id}/price-history")
+async def packaging_price_history(pk_id: str):
+    docs = await db.purchases.find(
+        {"packaging_id": pk_id},
+        {"_id": 0}
+    ).sort("date", -1).to_list(200)
+    return docs
 
 
 # ============== Customers ==============

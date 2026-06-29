@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { fetchSales, fetchMenus, createSale, deleteSale } from "@/lib/api";
+import { fetchSales, fetchMenus, createSale, deleteSale, fetchCustomers } from "@/lib/api";
 import { formatIDR, formatDate, todayISO, channelLabel } from "@/lib/format";
 import PageHeader from "@/components/PageHeader";
 import EmptyState from "@/components/EmptyState";
@@ -11,7 +11,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
-import { Plus, Trash2, ShoppingBag, X, Download, ChevronLeft, ChevronRight } from "lucide-react";
+import { Plus, Trash2, ShoppingBag, X, Download, ChevronLeft, ChevronRight, RefreshCw } from "lucide-react";
 import { toast } from "sonner";
 
 const channels = [
@@ -55,18 +55,37 @@ const exportCSV = (sales, label) => {
 export default function Sales() {
   const [sales, setSales] = useState([]);
   const [menus, setMenus] = useState([]);
+  const [customers, setCustomers] = useState([]);
   const [open, setOpen] = useState(false);
   const [month, setMonth] = useState(todayISO().slice(0, 7));
-  const [form, setForm] = useState({ date: todayISO(), channel: "shopeefood", items: [], discount: 0, notes: "" });
+  const [form, setForm] = useState({ date: todayISO(), channel: "shopeefood", items: [], discount: 0, customer_id: "", customer_name: "", notes: "" });
 
   const load = async () => {
-    const [s, m] = await Promise.all([fetchSales(), fetchMenus()]);
-    setSales(s); setMenus(m);
+    const [s, m, c] = await Promise.all([fetchSales(), fetchMenus(), fetchCustomers()]);
+    setSales(s); setMenus(m); setCustomers(c);
   };
   useEffect(() => { load(); }, []);
 
   const openCreate = () => {
-    setForm({ date: todayISO(), channel: "shopeefood", items: [], discount: 0, notes: "" });
+    setForm({ date: todayISO(), channel: "shopeefood", items: [], discount: 0, customer_id: "", customer_name: "", notes: "" });
+    setOpen(true);
+  };
+
+  const repeatLast = () => {
+    const last = sales[0];
+    if (!last) { toast.error("Belum ada transaksi untuk diulang"); return; }
+    setForm({
+      date: todayISO(),
+      channel: last.channel,
+      items: last.items.map((it) => {
+        const m = menus.find((mn) => mn.id === it.menu_id);
+        return { menu_id: it.menu_id, menu_name: it.menu_name, qty: it.qty, price: m?.computed?.selling_price || it.price };
+      }),
+      discount: 0,
+      customer_id: last.customer_id || "",
+      customer_name: last.customer_name || "",
+      notes: "",
+    });
     setOpen(true);
   };
 
@@ -83,6 +102,8 @@ export default function Sales() {
         date: form.date, channel: form.channel,
         items: form.items.map((it) => ({ menu_id: it.menu_id, menu_name: it.menu_name, qty: Number(it.qty), price: Number(it.price) })),
         discount: Number(form.discount) || 0,
+        customer_id: form.customer_id || null,
+        customer_name: form.customer_name || null,
         notes: form.notes || null,
       });
       toast.success("Penjualan dicatat & stok terpotong");
@@ -114,6 +135,11 @@ export default function Sales() {
             <Button onClick={() => exportCSV(filtered, month)} variant="outline" className="border-[#4A6750] text-[#4A6750]" data-testid="export-csv-btn">
               <Download size={14} className="mr-2" /> Export CSV
             </Button>
+            {sales.length > 0 && (
+              <Button onClick={repeatLast} variant="outline" className="border-[#D17B60] text-[#D17B60] hover:bg-[#FAEDE9]" data-testid="repeat-last-btn">
+                <RefreshCw size={14} className="mr-2" /> Ulangi Terakhir
+              </Button>
+            )}
             <Button onClick={openCreate} className="bg-[#4A6750] hover:bg-[#3B5340] text-white" data-testid="add-sale-btn">
               <Plus size={16} className="mr-2" /> Catat Penjualan
             </Button>
@@ -173,7 +199,10 @@ export default function Sales() {
               <tr key={s.id} className="border-b border-[#E5E2DC] hover:bg-[#FDFBF7]" data-testid={`sale-row-${s.id}`}>
                 <td className="py-3 px-4 text-[#2D3A30]">{formatDate(s.date)}</td>
                 <td className="py-3 px-4"><Badge variant="outline" className="border-[#E5E2DC] text-[#2D3A30]">{channelLabel(s.channel)}</Badge></td>
-                <td className="py-3 px-4 text-[#6B756D]">{s.items.map((i) => `${i.menu_name} ×${i.qty}`).join(", ")}</td>
+                <td className="py-3 px-4 text-[#6B756D]">
+                  {s.items.map((i) => `${i.menu_name} ×${i.qty}`).join(", ")}
+                  {s.customer_name && <span className="block text-xs text-[#4A6750] mt-0.5">👤 {s.customer_name}</span>}
+                </td>
                 <td className="py-3 px-4 text-right text-[#2D3A30]">{formatIDR(s.subtotal)}</td>
                 <td className="py-3 px-4 text-right text-[#6B756D]">- {formatIDR(s.platform_fee + s.discount)}</td>
                 <td className="py-3 px-4 text-right font-semibold text-[#2D3A30]">{formatIDR(s.total)}</td>
@@ -237,6 +266,23 @@ export default function Sales() {
                 <p className="font-bold text-[#2D3A30] text-lg">{formatIDR(subtotal)}</p>
               </div>
             </div>
+
+            {customers.length > 0 && (
+              <div>
+                <Label>Customer (opsional)</Label>
+                <Select value={form.customer_id || "__none__"} onValueChange={(v) => {
+                  if (v === "__none__") { setForm({ ...form, customer_id: "", customer_name: "" }); return; }
+                  const c = customers.find((cu) => cu.id === v);
+                  setForm({ ...form, customer_id: v, customer_name: c?.name || "" });
+                }}>
+                  <SelectTrigger data-testid="sale-customer-select"><SelectValue placeholder="Pilih customer..." /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="__none__">— Tanpa customer —</SelectItem>
+                    {customers.map((c) => (<SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>))}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
 
             <div><Label>Catatan</Label><Textarea rows={2} value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} data-testid="sale-notes-input" /></div>
           </div>
